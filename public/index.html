@@ -35,6 +35,8 @@
   .btn-primary:hover { background: #f5ff6e; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(232,255,71,0.3); }
   .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: var(--accent2); color: white; }
+  .btn-danger:hover { background: #ff6b85; transform: translateY(-2px); }
   .btn-sm { padding: 10px 20px; font-size: 12px; }
   .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
   .w-full { width: 100%; justify-content: center; }
@@ -193,6 +195,23 @@
   .toast.error   { border-color:var(--accent2); color:var(--accent2); }
   .toast.info    { border-color:var(--accent);  color:var(--accent); }
   #confetti-canvas { position:fixed; inset:0; pointer-events:none; z-index:9998; }
+
+  /* TESTING MODE BANNER */
+  #testing-banner {
+    display: none;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 99999;
+    background: repeating-linear-gradient(
+      45deg, #ff4d6d 0px, #ff4d6d 10px, #c2003a 10px, #c2003a 20px
+    );
+    color: white; font-family: 'Space Mono', monospace;
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-align: center; padding: 6px 16px; text-transform: uppercase;
+    cursor: pointer; user-select: none;
+  }
+  #testing-banner:hover { opacity: 0.85; }
+  #testing-banner.visible { display: block; }
+  /* Push all screen content down when banner is showing */
+  body.testing-mode .screen.active { padding-top: 60px; }
   @media (max-width:560px) {
     .guess-grid { grid-template-columns:1fr; }
     .game-header { padding:11px 14px; }
@@ -203,6 +222,10 @@
 </style>
 </head>
 <body>
+
+<div id="testing-banner" title="Click to wipe DB and re-seed">
+  ⚠ ALPHA TESTING MODE — DB resets on restart &nbsp;|&nbsp; Click to reset now
+</div>
 
 <div class="toast" id="toast"></div>
 <canvas id="confetti-canvas"></canvas>
@@ -250,11 +273,27 @@
     <div class="form-group">
       <label class="form-label">Song Era</label>
       <select class="form-select" id="era-select">
-        <option value="all">All Time</option>
-        <option value="60s70s">60s & 70s Classics</option>
-        <option value="80s90s">80s & 90s Hits</option>
-        <option value="2000s">2000s Bangers</option>
+        <option value="all">All Eras</option>
+        <option value="60s70s">60s & 70s</option>
+        <option value="80s90s">80s & 90s</option>
+        <option value="2000s">2000s</option>
         <option value="modern">Modern (2010+)</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Genre</label>
+      <select class="form-select" id="genre-select">
+        <option value="all">All Genres</option>
+        <option value="pop">Pop</option>
+        <option value="rock">Rock</option>
+        <option value="hip-hop">Hip-Hop</option>
+        <option value="90s-rap">90s Rap</option>
+        <option value="rnb">R&amp;B / Soul</option>
+        <option value="country">Country</option>
+        <option value="dance">Dance / Electronic</option>
+        <option value="classic-rock">Classic Rock</option>
+        <option value="soul">Soul / Motown</option>
+        <option value="soundtracks">Movie Soundtracks</option>
       </select>
     </div>
   </div>
@@ -270,7 +309,7 @@
       <div class="ht-step"><div class="ht-n">1</div><div class="ht-body"><h3>Listen to the Instrumental</h3><p>A karaoke/instrumental version of an iconic song plays — no vocals, just melody.</p></div></div>
       <div class="ht-step"><div class="ht-n">2</div><div class="ht-body"><h3>Guess Artist & Song</h3><p>Type the artist name on the left, the song title on the right. Each earns points independently.</p></div></div>
       <div class="ht-step"><div class="ht-n">3</div><div class="ht-body"><h3>Speed = Points</h3><p>The faster you get it right, the more you earn. Nailing it in 5 seconds earns max points.</p></div></div>
-      <div class="ht-step"><div class="ht-n">4</div><div class="ht-body"><h3>Skip Anytime</h3><p>Not sure? Hit Skip to reveal the answer and move straight to the next round.</p></div></div>
+      <div class="ht-step"><div class="ht-n">4</div><div class="ht-body"><h3>Filter by Era & Genre</h3><p>Choose from Pop, Rock, Hip-Hop, 90s Rap, R&B, Country, Dance, Soundtracks and more — or mix everything together.</p></div></div>
     </div>
   </div>
   <div class="card" style="max-width:540px; margin-top:0;">
@@ -367,6 +406,9 @@
   <div class="res-actions" style="margin-top:16px;">
     <button class="btn btn-primary"   onclick="replayGame()">Play Again</button>
     <button class="btn btn-secondary" onclick="showScreen('home')">Main Menu</button>
+    <button class="btn btn-danger" id="reset-btn" onclick="resetDatabase()" style="display:none;">
+      🗑 Reset DB
+    </button>
   </div>
 </div>
 
@@ -423,6 +465,7 @@ async function startGame(){
   const players=Array.from({length:playerCount},(_,i)=>document.getElementById(`pn${i}`)?.value.trim()||DN[i]);
   const rounds=parseInt(document.getElementById('rounds-select').value);
   const era=document.getElementById('era-select').value;
+  const genre=document.getElementById('genre-select').value;
 
   // Show loading screen
   showScreen('loading');
@@ -430,7 +473,7 @@ async function startGame(){
 
   let songs;
   try{
-    const res=await fetch(`/api/songs?era=${encodeURIComponent(era)}&count=${rounds}`);
+    const res=await fetch(`/api/songs?era=${encodeURIComponent(era)}&genre=${encodeURIComponent(genre)}&count=${rounds}`);
     if(!res.ok) throw new Error('Server error');
     const data=await res.json();
     songs=data.songs;
@@ -789,7 +832,50 @@ function confirmQuit(){
   if(confirm('Quit the current game?')){G.active=false;clearInterval(G.timerInterval);stopAudio();showScreen('home');}
 }
 
-window.addEventListener('DOMContentLoaded',renderPlayers);
+window.addEventListener('DOMContentLoaded', () => {
+  renderPlayers();
+  initTestingMode();
+});
+
+// ── Testing mode ──────────────────────────────────────────────────────────────
+let testingMode = false;
+
+async function initTestingMode() {
+  try {
+    const res  = await fetch('/api/config');
+    const data = await res.json();
+    testingMode = data.testing === true;
+  } catch (e) {
+    testingMode = false;
+  }
+
+  if (!testingMode) return;
+
+  // Show the warning banner
+  document.body.classList.add('testing-mode');
+  document.getElementById('testing-banner').classList.add('visible');
+  document.getElementById('testing-banner').addEventListener('click', () => {
+    if (confirm('Reset the song database now? This will wipe all songs and re-seed from Deezer.')) {
+      resetDatabase();
+    }
+  });
+
+  // Show the reset button on the results screen
+  const btn = document.getElementById('reset-btn');
+  if (btn) btn.style.display = '';
+}
+
+async function resetDatabase() {
+  if (!testingMode) return;
+  showToast('Resetting database…', 'info');
+  try {
+    const res  = await fetch('/api/admin/reset');
+    const data = await res.json();
+    showToast(data.message || 'Reset triggered', 'success');
+  } catch (e) {
+    showToast('Reset failed — check server logs', 'error');
+  }
+}
 </script>
 </body>
 </html>
