@@ -1,117 +1,129 @@
-# 🎵 Tip of Your Tongue — Music Trivia
+# 🎵 Tip of Your Tongue v2
 
-A music trivia game powered by Spotify previews. Players never need a Spotify account — you host the credentials on your server.
-
----
-
-## Local Development
-
-### 1. Install dependencies
-```bash
-npm install
-```
-
-### 2. Set up your Spotify app
-- Go to https://developer.spotify.com/dashboard
-- Create a new app (any name)
-- **No Redirect URI needed** — we use Client Credentials (server-to-server)
-- Copy your **Client ID** and **Client Secret**
-
-### 3. Create your .env file
-```bash
-cp .env.example .env
-```
-Edit `.env` and fill in your credentials:
-```
-SPOTIFY_CLIENT_ID=your_client_id_here
-SPOTIFY_CLIENT_SECRET=your_client_secret_here
-```
-
-### 4. Run locally
-```bash
-npm run dev       # development (auto-restarts on file changes)
-# or
-npm start         # production
-```
-
-Open http://localhost:3000 — players can join with no Spotify account needed.
-
----
-
-## Deploy to Render (Free Hosting)
-
-Render's free tier keeps your server running and is perfect for this game.
-
-### 1. Push to GitHub
-```bash
-git init
-git add .
-git commit -m "initial commit"
-gh repo create tip-of-your-tongue --public --push
-# or push to an existing repo
-```
-
-### 2. Create a Render Web Service
-- Go to https://render.com and sign in
-- Click **New → Web Service**
-- Connect your GitHub repo
-- Configure:
-  - **Name:** tip-of-your-tongue (or anything)
-  - **Runtime:** Node
-  - **Build Command:** `npm install`
-  - **Start Command:** `npm start`
-  - **Instance Type:** Free
-
-### 3. Add Environment Variables in Render
-In your service dashboard → **Environment** tab, add:
-- `SPOTIFY_CLIENT_ID` = your client ID
-- `SPOTIFY_CLIENT_SECRET` = your client secret
-
-### 4. Deploy
-Render will auto-deploy on every push to main. Share the URL with players — no setup required on their end.
+Music trivia with instrumental previews. Songs stored in PostgreSQL — scale to 20,000+ with a CSV import.
 
 ---
 
 ## Architecture
 
 ```
-Player's browser
-      │
-      │  GET /api/preview?q=Bohemian+Rhapsody+Queen
-      ▼
-Your Express Server (server.js)
-      │  ← holds SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET
-      │
-      │  POST https://accounts.spotify.com/api/token
-      │  GET  https://api.spotify.com/v1/search?q=...
-      ▼
-  Spotify API
-      │
-      │  returns preview_url (CDN link to 30s MP3)
-      ▼
-Your Express Server
-      │
-      │  returns { previewUrl, trackName, artistName }
-      ▼
-Player's browser
-      │  fetches the MP3 directly from Spotify's CDN
-      ▼
-  Audio plays 🎵
+Browser → GET /api/songs?era=all&count=10   → PostgreSQL (random draw)
+Browser → GET /api/preview?id=42            → Deezer karaoke/instrumental search
+                                               └→ cached in DB + memory
 ```
 
-**Key point:** Your Spotify credentials never leave your server. The preview URL returned is a public CDN link — players fetch audio directly from Spotify's CDN, so bandwidth cost to you is zero.
+**No hardcoded song arrays.** The entire catalog lives in Postgres. Adding songs = importing a CSV.
 
 ---
 
-## Project Structure
+## Render Setup (First Time)
 
+### 1. Create a PostgreSQL database on Render
+- In your Render dashboard → New → PostgreSQL
+- Free tier is fine for development
+- Copy the **Internal Database URL** (use this for `DATABASE_URL` on the same Render account)
+
+### 2. Add environment variables to your Web Service
+In your Render Web Service → Environment tab:
 ```
-tip-of-your-tongue/
-├── server.js          # Express server + Spotify proxy
-├── package.json
-├── .env               # Your secrets (never commit this)
-├── .env.example       # Template
-├── .gitignore
-└── public/
-    └── index.html     # The game (served as static file)
+DATABASE_URL=<your Internal Database URL>
+NODE_ENV=production
 ```
+
+### 3. Run the seed script (one time only)
+After deploying, go to your Render Web Service → Shell tab:
+```bash
+npm run seed
+```
+This creates the `songs` table and inserts the initial 100-song catalog.
+
+### 4. Verify
+```bash
+curl https://your-app.onrender.com/api/health
+curl https://your-app.onrender.com/api/stats
+```
+
+---
+
+## Local Development
+
+```bash
+npm install
+cp .env.example .env
+# Fill in DATABASE_URL pointing to your Render DB (use the External URL locally)
+
+npm run seed    # first time only
+npm run dev     # starts server with nodemon
+```
+
+---
+
+## Adding More Songs
+
+### Option A — Single insert
+```sql
+INSERT INTO songs (title, artist, era, decade, deezer_query) VALUES
+  ('Waterloo', 'ABBA', '60s70s', 1974, 'artist:"ABBA" track:"Waterloo" karaoke');
+```
+
+### Option B — CSV bulk import (for 100s or 1000s of songs)
+Create a CSV file `new_songs.csv`:
+```csv
+title,artist,era,decade,deezer_query
+"Waterloo","ABBA","60s70s",1974,"artist:""ABBA"" track:""Waterloo"" karaoke"
+"Jolene","Dolly Parton","60s70s",1973,"artist:""Dolly Parton"" track:""Jolene"" karaoke"
+```
+
+Then import:
+```bash
+psql $DATABASE_URL -c "\copy songs(title,artist,era,decade,deezer_query) FROM 'new_songs.csv' CSV HEADER"
+```
+
+### Option C — Disable a song without deleting it
+```sql
+UPDATE songs SET enabled = false WHERE title = 'Some Song';
+```
+
+---
+
+## Deezer Query Tips
+
+The `deezer_query` column controls what Deezer searches for. The format is:
+```
+artist:"Artist Name" track:"Song Title" karaoke
+```
+
+- Use `karaoke` for pop/vocal songs — returns karaoke versions (instrumental backing tracks)
+- Use `instrumental` for rock/guitar songs — returns instrumental covers
+- Both terms can be combined: `artist:"Queen" track:"Bohemian Rhapsody" karaoke instrumental`
+- The server tries up to 3 fallback queries if the primary one has no preview
+
+---
+
+## Database Schema
+
+```sql
+CREATE TABLE songs (
+  id               SERIAL PRIMARY KEY,
+  title            TEXT NOT NULL,
+  artist           TEXT NOT NULL,
+  era              TEXT NOT NULL DEFAULT 'all',   -- 60s70s | 80s90s | 2000s | modern
+  decade           SMALLINT,                       -- e.g. 1975, 1983
+  deezer_query     TEXT NOT NULL,                  -- search string for Deezer API
+  preview_cache    TEXT,                           -- cached Deezer preview URL
+  preview_cached_at TIMESTAMPTZ,                   -- when the cache was set
+  enabled          BOOLEAN NOT NULL DEFAULT TRUE,  -- soft delete
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+---
+
+## API Reference
+
+| Endpoint | Params | Description |
+|---|---|---|
+| `GET /api/songs` | `era`, `count` | Random songs from DB |
+| `GET /api/preview` | `id` | Deezer instrumental preview URL |
+| `GET /api/stats` | — | Song counts by era |
+| `GET /api/health` | — | DB connectivity check |
