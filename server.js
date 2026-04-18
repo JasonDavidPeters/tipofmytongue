@@ -1,112 +1,86 @@
 /**
- * Tip of Your Tongue — Backend Server
- * Proxies Spotify API requests so players never need to authenticate.
- * Your Spotify credentials stay server-side only.
+ * Tip of Your Tongue — server.js
+ *
+ * Uses the Deezer API for 30-second track previews.
+ * No API key or credentials required — Deezer's search endpoint is public.
+ * We proxy it server-side because Deezer does not support CORS.
  */
 
 require('dotenv').config();
-const express  = require('express');
-const cors     = require('cors');
-const fetch    = require('node-fetch');
-const path     = require('path');
+const express = require('express');
+const path    = require('path');
+const app     = express();
+const PORT    = process.env.PORT || 3000;
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
-
-// ─── Validate env ────────────────────────────────────────────────────────────
-const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET } = process.env;
-if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
-  console.error('❌  Missing SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET in .env');
-  process.exit(1);
-}
-
-// ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public'))); // serves index.html
+app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── Spotify token cache (Client Credentials — no user login needed) ─────────
-let cachedToken     = null;
-let tokenExpiresAt  = 0;
+// ─── Simple in-memory cache to avoid hammering Deezer for the same song ───────
+const previewCache = new Map(); // q → { previewUrl, trackName, artistName, albumArt }
 
-async function getSpotifyToken() {
-  if (cachedToken && Date.now() < tokenExpiresAt) return cachedToken;
+// ─── GET /api/preview?q=Bohemian+Rhapsody+Queen ───────────────────────────────
+app.get('/api/preview', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'Missing query param: q' });
 
-  const creds  = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64');
-  const res    = await fetch('https://accounts.spotify.com/api/token', {
-    method:  'POST',
-    headers: {
-      Authorization:  `Basic ${creds}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Spotify token error: ${res.status} — ${err}`);
+  // Return from cache if we have it
+  if (previewCache.has(q)) {
+    return res.json(previewCache.get(q));
   }
 
-  const data       = await res.json();
-  cachedToken      = data.access_token;
-  tokenExpiresAt   = Date.now() + (data.expires_in - 60) * 1000; // refresh 1 min early
-  console.log('🎵  Spotify token refreshed');
-  return cachedToken;
-}
-
-// ─── API: Search for a track preview ─────────────────────────────────────────
-// GET /api/preview?q=Bohemian+Rhapsody+Queen
-app.get('/api/preview', async (req, res) => {
-  const q = req.query.q;
-  if (!q) return res.status(400).json({ error: 'Missing query parameter: q' });
-
   try {
-    const token  = await getSpotifyToken();
-    const url    = `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=track&limit=10`;
-    const spotRes = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // Deezer search — no auth needed, returns 30s preview_url on most tracks
+    const url = `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=10`;
+    const deezerRes = await fetch(url);
 
-    if (!spotRes.ok) {
-      const err = await spotRes.text();
-      return res.status(spotRes.status).json({ error: err });
+    if (!deezerRes.ok) {
+      console.error(`Deezer error: ${deezerRes.status}`);
+      return res.status(502).json({ error: 'Deezer API error', previewUrl: null });
     }
 
-    const data   = await spotRes.json();
-    const tracks = data?.tracks?.items || [];
+    const data   = await deezerRes.json();
+    const tracks = data?.data ?? [];
 
-    // Find the first track that has a preview URL
+    // Pick the first result that has a working preview
+    let result = null;
     for (const track of tracks) {
-      if (track.preview_url) {
-        return res.json({
-          previewUrl:   track.preview_url,
-          trackName:    track.name,
-          artistName:   track.artists.map(a => a.name).join(', '),
-          albumArt:     track.album?.images?.[1]?.url ?? null,
-        });
+      if (track.preview) {
+        result = {
+          previewUrl:  track.preview,                      // direct MP3 URL, no auth needed
+          trackName:   track.title,
+          artistName:  track.artist?.name ?? '',
+          albumArt:    track.album?.cover_medium ?? null,
+        };
+        break;
       }
     }
 
-    // No preview available for any result
-    return res.json({ previewUrl: null });
+    if (!result) {
+      result = { previewUrl: null, trackName: null, artistName: null, albumArt: null };
+    }
+
+    // Cache successful results (only cache hits, not misses — misses may resolve later)
+    if (result.previewUrl) previewCache.set(q, result);
+
+    return res.json(result);
 
   } catch (err) {
-    console.error('Preview fetch error:', err.message);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('[/api/preview]', err.message);
+    return res.status(500).json({ error: 'Internal server error', previewUrl: null });
   }
 });
 
-// ─── Health check (used by Render to confirm the server is up) ───────────────
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// ─── Health check (Render uses this to confirm the service is up) ─────────────
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', source: 'deezer', timestamp: new Date().toISOString() });
 });
 
-// ─── Catch-all: serve the game SPA ───────────────────────────────────────────
-app.get('*', (req, res) => {
+// ─── Catch-all: serve the SPA ─────────────────────────────────────────────────
+app.get('*', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ─── Start ────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`🎵  Tip of Your Tongue server running on http://localhost:${PORT}`);
+  console.log(`🎵 Tip of Your Tongue running on http://localhost:${PORT}`);
+  console.log(`   Audio source: Deezer (no credentials required)`);
 });
