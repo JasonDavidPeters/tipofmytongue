@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tip of Your Tongue — Music Trivia</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080b10;
+    --surface: #0f1318;
+    --surface2: #161c24;
+    --border: #1e2730;
+    --accent: #e8ff47;
+    --accent2: #ff4d6d;
+    --accent3: #4dffb4;
+    --text: #f0f4ff;
+    --muted: #6b7a8d;
+    --gold: #ffd166;
+    --silver: #b0bec5;
+    --bronze: #cd7c51;
+    --spotify: #1DB954;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.3;
+  }
+  body::after {
+    content: '';
+    position: fixed; top: -20%; left: 50%; transform: translateX(-50%);
+    width: 800px; height: 400px;
+    background: radial-gradient(ellipse, rgba(232,255,71,0.04) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .screen { display: none; position: relative; z-index: 1; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 40px 20px; }
+
+  /* LOGO */
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: clamp(48px,10vw,92px); letter-spacing: 2px; line-height: 0.9; text-align: center; }
+  .logo span { color: var(--accent); }
+  .logo .sub { font-family: 'DM Sans', sans-serif; font-size: clamp(10px,2vw,13px); color: var(--muted); font-weight: 300; letter-spacing: 8px; display: block; margin-top: 10px; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 32px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; transition: all 0.15s ease; clip-path: polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%); }
+  .btn-primary  { background: var(--accent); color: #080b10; }
+  .btn-primary:hover  { background: #f5ff6e; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(232,255,71,0.3); }
+  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 10px 20px; font-size: 12px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+  .w-full { width: 100%; justify-content: center; }
+
+  /* CARD */
+  .card { background: var(--surface); border: 1px solid var(--border); padding: 32px; position: relative; width: 100%; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg,transparent,var(--accent),transparent); opacity: 0.35; }
+
+  /* FORM */
+  .form-label { display: block; font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .form-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .form-input:focus { border-color: var(--accent); }
+  .form-select { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 12px 16px; font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; appearance: none; cursor: pointer; }
+  .form-group { margin-bottom: 18px; }
+  .divider { width: 100%; height: 1px; background: var(--border); }
+
+  /* HOME */
+  #screen-home { justify-content: center; gap: 48px; }
+  .hero-section { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .tagline { color: var(--muted); font-size: 15px; text-align: center; max-width: 340px; line-height: 1.65; }
+  .vinyl-anim { width: 120px; height: 120px; animation: spin 8s linear infinite; }
+  @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  .home-menu { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 380px; }
+  .home-menu .btn { width: 100%; justify-content: center; padding: 18px 32px; font-size: 16px; }
+
+  /* SETUP */
+  #screen-setup { gap: 28px; max-width: 540px; margin: 0 auto; }
+  .setup-title { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 2px; color: var(--accent); margin-bottom: 18px; }
+  .player-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .player-entry { display: flex; gap: 8px; align-items: center; }
+  .player-num { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--accent); width: 24px; flex-shrink: 0; }
+  .remove-player { background: none; border: 1px solid var(--border); color: var(--muted); width: 30px; height: 30px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+  .remove-player:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* HOW TO */
+  #screen-howto { gap: 28px; max-width: 540px; margin: 0 auto; }
+  .ht-step { display: flex; gap: 16px; align-items: flex-start; }
+  .ht-n { font-family: 'Bebas Neue', sans-serif; font-size: 44px; color: var(--accent); line-height: 1; flex-shrink: 0; width: 32px; }
+  .ht-body h3 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .ht-body p  { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .pt-tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .pt-tbl th { text-align: left; padding: 8px 12px; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .pt-tbl td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .pt-tbl tr:last-child td { border-bottom: none; }
+  .pv { font-family: 'Space Mono', monospace; color: var(--accent); font-weight: 700; }
+
+  /* GAME */
+  #screen-game { gap: 0; padding: 0; }
+  .game-header { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 14px 28px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+  .game-logo { font-family: 'Bebas Neue', sans-serif; font-size: 22px; color: var(--accent); letter-spacing: 2px; }
+  .round-info { text-align: center; font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .round-info strong { display: block; font-size: 20px; color: var(--text); letter-spacing: 0; }
+  .game-body { width: 100%; max-width: 720px; margin: 0 auto; padding: 36px 20px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* VINYL */
+  .vinyl-stage { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .vinyl-player { position: relative; width: 180px; height: 180px; }
+  .vinyl-disc {
+    width: 180px; height: 180px; border-radius: 50%;
+    background: radial-gradient(circle at center,
+      #1a1a1a 0%, #0d0d0d 18%, #222 19%, #111 33%,
+      #1a1a1a 34%, #0d0d0d 48%, #222 49%, #111 63%,
+      #1a1a1a 64%, #080808 100%);
+    box-shadow: 0 0 0 2px #2a2a2a, 0 14px 50px rgba(0,0,0,0.85);
+    transition: box-shadow 0.4s;
+  }
+  .vinyl-disc.spinning { animation: spin 1.8s linear infinite; box-shadow: 0 0 0 2px #2a2a2a, 0 14px 50px rgba(0,0,0,0.85), 0 0 50px rgba(232,255,71,0.08); }
+  .vinyl-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: background 0.3s; }
+  .vc-idle    { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); }
+  .vc-playing { background: var(--accent); color: #080b10; font-weight: 900; }
+  .vc-success { background: var(--accent3); color: #080b10; }
+  .vc-error   { background: var(--accent2); color: white; }
+  .fetch-ring { position: absolute; inset: -8px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--accent); animation: spin 0.9s linear infinite; display: none; }
+  .vinyl-player.fetching .fetch-ring { display: block; }
+
+  /* TIMER */
+  .timer-wrap { width: 100%; max-width: 460px; }
+  .timer-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+  .timer-digits { font-family: 'Space Mono', monospace; font-size: 56px; font-weight: 700; color: var(--accent); line-height: 1; transition: color 0.4s; }
+  .timer-digits.warn   { color: var(--gold); }
+  .timer-digits.danger { color: var(--accent2); animation: blink 0.6s infinite alternate; }
+  @keyframes blink { to { opacity: 0.5; } }
+  .timer-lbl { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+  .timer-bg { width: 100%; height: 4px; background: var(--surface2); border: 1px solid var(--border); overflow: hidden; }
+  .timer-fill { height: 100%; background: linear-gradient(90deg,var(--accent),var(--accent3)); transition: width 0.1s linear, background 0.4s; }
+  .timer-fill.warn   { background: linear-gradient(90deg,var(--gold),var(--accent)); }
+  .timer-fill.danger { background: linear-gradient(90deg,var(--accent2),var(--gold)); }
+
+  /* STATUS */
+  .status-row { min-height: 34px; display: flex; justify-content: center; }
+  .sbadge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 13px; font-weight: 600; border: 1px solid; animation: fadeIn 0.25s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+  .sb-load { color: var(--muted);   border-color: var(--border); }
+  .sb-play { color: var(--accent3); border-color: rgba(77,255,180,0.3); background: rgba(77,255,180,0.04); }
+  .sb-warn { color: var(--gold);    border-color: rgba(255,209,102,0.3); background: rgba(255,209,102,0.04); }
+  .sb-err  { color: var(--accent2); border-color: rgba(255,77,109,0.3);  background: rgba(255,77,109,0.04); }
+  .sb-dot  { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* CURRENT PLAYER */
+  .cp-area { min-height: 34px; display: flex; justify-content: center; }
+  .cp-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 18px; font-size: 13px; color: var(--accent); font-weight: 600; background: rgba(232,255,71,0.05); border: 1px solid rgba(232,255,71,0.18); letter-spacing: 1px; }
+  .cp-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; }
+
+  /* GUESS */
+  .guess-section { display: flex; flex-direction: column; gap: 10px; }
+  .guess-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .guess-wrap { position: relative; }
+  .guess-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 13px; pointer-events: none; }
+  .guess-field { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 13px 13px 13px 40px; font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; transition: border-color 0.2s; }
+  .guess-field::placeholder { color: var(--muted); }
+  .guess-field:focus { border-color: rgba(232,255,71,0.4); }
+  .guess-field.correct { border-color: var(--accent3) !important; background: rgba(77,255,180,0.04); color: var(--accent3); }
+  .guess-field.wrong   { border-color: var(--accent2); animation: shake 0.35s ease; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+  .guess-actions { display: flex; gap: 10px; }
+  .guess-actions .btn { flex: 1; justify-content: center; }
+
+  /* REVEAL */
+  .reveal-card { background: var(--surface); border: 1px solid var(--border); padding: 24px; animation: slideUp 0.35s ease; }
+  @keyframes slideUp { from{transform:translateY(14px);opacity:0} to{transform:translateY(0);opacity:1} }
+  .reveal-eyebrow { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .reveal-title  { font-family: 'Bebas Neue', sans-serif; font-size: 40px; letter-spacing: 1px; line-height: 1; }
+  .reveal-artist { font-size: 15px; color: var(--muted); margin-top: 5px; }
+  .reveal-badges { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .rb        { padding: 5px 13px; font-size: 12px; font-weight: 700; font-family: 'Space Mono', monospace; border: 1px solid; }
+  .rb-song   { color: var(--accent);  border-color: rgba(232,255,71,0.3);  background: rgba(232,255,71,0.07); }
+  .rb-artist { color: var(--accent3); border-color: rgba(77,255,180,0.25); background: rgba(77,255,180,0.06); }
+  .rb-none   { color: var(--muted);   border-color: var(--border); }
+
+  /* SCOREBOARD */
+  .sb-wrap { width: 100%; }
+  .sb-label { font-size: 10px; letter-spacing: 4px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .sb-list { display: flex; flex-direction: column; gap: 4px; }
+  .sb-row { display: flex; align-items: center; gap: 12px; padding: 9px 14px; background: var(--surface2); border: 1px solid var(--border); transition: all 0.3s; }
+  .sb-row.active { border-color: rgba(232,255,71,0.28); background: rgba(232,255,71,0.04); }
+  .sb-rank { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--muted); width: 20px; }
+  .sb-name { flex: 1; font-size: 14px; font-weight: 500; }
+  .sb-pts  { font-family: 'Space Mono', monospace; font-size: 14px; color: var(--accent); font-weight: 700; }
+  .sb-delta { font-size: 11px; color: var(--accent3); font-weight: 700; min-width: 42px; text-align: right; opacity: 0; transition: opacity 0.4s; }
+  .sb-delta.show { opacity: 1; }
+
+  /* RESULTS */
+  #screen-results { gap: 36px; max-width: 580px; margin: 0 auto; }
+  .res-title { font-family: 'Bebas Neue', sans-serif; font-size: 68px; letter-spacing: 4px; text-align: center; line-height: 0.9; }
+  .res-title span { color: var(--accent); }
+  .podium { display: flex; align-items: flex-end; justify-content: center; gap: 6px; width: 100%; }
+  .pod-place { display: flex; flex-direction: column; align-items: center; gap: 7px; flex: 1; max-width: 150px; }
+  .pod-name { font-size: 13px; font-weight: 600; text-align: center; }
+  .pod-pts  { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); }
+  .pod-block { width: 100%; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 34px; }
+  .pod-1 .pod-block { background: var(--gold);   color: #080b10; height: 130px; }
+  .pod-2 .pod-block { background: var(--silver); color: #080b10; height: 90px; }
+  .pod-3 .pod-block { background: var(--bronze); color: #080b10; height: 65px; }
+  .final-list { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+  .final-row { display: flex; align-items: center; gap: 14px; padding: 13px 18px; background: var(--surface); border: 1px solid var(--border); }
+  .fr-rank { font-family: 'Bebas Neue', sans-serif; font-size: 26px; color: var(--muted); width: 26px; }
+  .fr-name { flex: 1; font-size: 15px; font-weight: 600; }
+  .fr-pts  { font-family: 'Space Mono', monospace; font-size: 17px; color: var(--accent); font-weight: 700; }
+  .res-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  /* MISC */
+  .back-btn { align-self: flex-start; background: none; border: none; color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; transition: color 0.2s; padding: 0; }
+  .back-btn:hover { color: var(--accent); }
+  .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface); border: 1px solid var(--border); padding: 11px 22px; font-size: 13px; font-weight: 600; transition: transform 0.28s ease; z-index: 10000; white-space: nowrap; pointer-events: none; }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent3); color: var(--accent3); }
+  .toast.error   { border-color: var(--accent2); color: var(--accent2); }
+  .toast.info    { border-color: var(--accent);  color: var(--accent); }
+  #confetti-canvas { position: fixed; inset: 0; pointer-events: none; z-index: 9998; }
+
+  @media (max-width: 560px) {
+    .guess-grid { grid-template-columns: 1fr; }
+    .game-header { padding: 11px 14px; }
+    .game-body { padding: 20px 14px; }
+    .card { padding: 18px; }
+    .timer-digits { font-size: 40px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+<canvas id="confetti-canvas"></canvas>
+
+<!-- ======================== HOME ======================== -->
+<div id="screen-home" class="screen active">
+  <div class="hero-section">
+    <svg class="vinyl-anim" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="58" fill="#111" stroke="#333" stroke-width="1"/>
+      <circle cx="60" cy="60" r="44" fill="none" stroke="#1a1a1a" stroke-width="1"/>
+      <circle cx="60" cy="60" r="28" fill="none" stroke="#222" stroke-width="1"/>
+      <circle cx="60" cy="60" r="13" fill="#e8ff47"/>
+      <circle cx="60" cy="60" r="4" fill="#080b10"/>
+    </svg>
+    <div class="logo">Tip of Your<br><span>Tongue</span><div class="sub">Music Trivia</div></div>
+    <p class="tagline">15 seconds. One song. How fast can you name it?</p>
+  </div>
+  <div class="home-menu">
+    <button class="btn btn-primary" onclick="showSetup()">▶ &nbsp;Play Now</button>
+    <button class="btn btn-secondary" onclick="showScreen('howto')">? &nbsp;How to Play</button>
+  </div>
+</div>
+
+<!-- ======================== SETUP ======================== -->
+<div id="screen-setup" class="screen">
+  <button class="back-btn" onclick="showScreen('home')">← Back</button>
+  <div class="logo" style="font-size:38px;text-align:center;margin-bottom:4px;">Game Setup</div>
+  <div class="card" style="max-width:540px;">
+    <div class="setup-title">Players</div>
+    <div class="form-group">
+      <div class="player-list" id="player-list"></div>
+      <button class="btn btn-secondary btn-sm" onclick="addPlayer()" id="add-player-btn">+ Add Player</button>
+    </div>
+    <div class="divider" style="margin:22px 0;"></div>
+    <div class="setup-title">Settings</div>
+    <div class="form-group">
+      <label class="form-label">Number of Rounds</label>
+      <select class="form-select" id="rounds-select">
+        <option value="5">5 Rounds</option>
+        <option value="10" selected>10 Rounds</option>
+        <option value="15">15 Rounds</option>
+        <option value="20">20 Rounds</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Song Era</label>
+      <select class="form-select" id="era-select">
+        <option value="all">All Time (Top 100)</option>
+        <option value="60s70s">60s & 70s Classics</option>
+        <option value="80s90s">80s & 90s Hits</option>
+        <option value="2000s">2000s Bangers</option>
+        <option value="modern">Modern (2010+)</option>
+      </select>
+    </div>
+  </div>
+  <button class="btn btn-primary w-full" style="max-width:540px;" onclick="startGame()">Start Game →</button>
+</div>
+
+<!-- ======================== HOW TO ======================== -->
+<div id="screen-howto" class="screen">
+  <button class="back-btn" onclick="showScreen('home')">← Back</button>
+  <div class="logo" style="font-size:38px;text-align:center;">How to Play</div>
+  <div class="card" style="max-width:540px;">
+    <div style="display:flex;flex-direction:column;gap:26px;">
+      <div class="ht-step"><div class="ht-n">1</div><div class="ht-body"><h3>Listen to the Clip</h3><p>A real Spotify preview of an iconic song plays. No lyrics shown — just listen!</p></div></div>
+      <div class="ht-step"><div class="ht-n">2</div><div class="ht-body"><h3>Guess Song & Artist</h3><p>Type either the song title, the artist, or both. Each is scored independently.</p></div></div>
+      <div class="ht-step"><div class="ht-n">3</div><div class="ht-body"><h3>Speed = Points</h3><p>The faster you get it right, the more points you earn. 0–5 seconds earns maximum points.</p></div></div>
+      <div class="ht-step"><div class="ht-n">4</div><div class="ht-body"><h3>Skip Anytime</h3><p>Not sure? Hit Skip to reveal the answer immediately and move to the next round.</p></div></div>
+    </div>
+  </div>
+  <div class="card" style="max-width:540px;">
+    <div class="setup-title">Points System</div>
+    <table class="pt-tbl">
+      <thead><tr><th>Timing</th><th>Song Title</th><th>Artist Name</th></tr></thead>
+      <tbody>
+        <tr><td>0 – 5 sec</td><td class="pv">500 pts</td><td class="pv">300 pts</td></tr>
+        <tr><td>5 – 10 sec</td><td class="pv">350 pts</td><td class="pv">200 pts</td></tr>
+        <tr><td>10 – 15 sec</td><td class="pv">150 pts</td><td class="pv">100 pts</td></tr>
+        <tr><td>Skip / Time Up</td><td class="pv">0 pts</td><td class="pv">0 pts</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-primary" onclick="showScreen('home')">Got It — Let's Play!</button>
+</div>
+
+<!-- ======================== GAME ======================== -->
+<div id="screen-game" class="screen">
+  <div class="game-header">
+    <div class="game-logo">🎵 TOYT</div>
+    <div class="round-info"><strong id="h-round">1</strong>of <span id="h-total">10</span> rounds</div>
+    <button class="btn btn-secondary btn-sm" onclick="confirmQuit()">Quit</button>
+  </div>
+  <div class="game-body">
+    <div class="cp-area" id="cp-area"></div>
+    <div class="vinyl-stage">
+      <div class="vinyl-player" id="vinyl-player">
+        <div class="fetch-ring"></div>
+        <div class="vinyl-disc" id="vinyl-disc">
+          <div class="vinyl-center vc-idle" id="vinyl-center">♪</div>
+        </div>
+      </div>
+      <div class="timer-wrap">
+        <div class="timer-row">
+          <div class="timer-digits" id="timer-digits">15</div>
+          <div class="timer-lbl">seconds left</div>
+        </div>
+        <div class="timer-bg"><div class="timer-fill" id="timer-fill"></div></div>
+      </div>
+    </div>
+    <div class="status-row" id="status-row"></div>
+    <div id="reveal-area" style="display:none;"></div>
+    <div class="guess-section" id="guess-section">
+      <div class="guess-grid">
+        <div class="guess-wrap">
+          <span class="guess-icon">🎵</span>
+          <input class="guess-field" id="guess-song" type="text" placeholder="Song title…" autocomplete="off" autocorrect="off" spellcheck="false">
+        </div>
+        <div class="guess-wrap">
+          <span class="guess-icon">🎤</span>
+          <input class="guess-field" id="guess-artist" type="text" placeholder="Artist name…" autocomplete="off" autocorrect="off" spellcheck="false">
+        </div>
+      </div>
+      <div class="guess-actions">
+        <button class="btn btn-primary" id="submit-btn" onclick="submitGuess()">Submit Guess</button>
+        <button class="btn btn-secondary" id="skip-btn" onclick="skipRound()">Skip</button>
+      </div>
+    </div>
+    <div id="next-area" style="display:none;text-align:center;">
+      <button class="btn btn-primary" onclick="nextRound()">Next Round →</button>
+    </div>
+    <div class="sb-wrap">
+      <div class="sb-label">Scoreboard</div>
+      <div class="sb-list" id="sb-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== RESULTS ======================== -->
+<div id="screen-results" class="screen">
+  <div class="res-title">Game<br><span>Over!</span></div>
+  <div class="podium" id="podium"></div>
+  <div class="final-list" id="final-list"></div>
+  <div class="res-actions" style="margin-top:16px;">
+    <button class="btn btn-primary" onclick="replayGame()">Play Again</button>
+    <button class="btn btn-secondary" onclick="showScreen('home')">Main Menu</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── Song database ─────────────────────────────────────────────────────────────
+const SONGS = [
+  { title:"Bohemian Rhapsody",           artist:"Queen",                     q:"Bohemian Rhapsody Queen",              era:"60s70s" },
+  { title:"Hotel California",            artist:"Eagles",                    q:"Hotel California Eagles",              era:"60s70s" },
+  { title:"Stairway to Heaven",          artist:"Led Zeppelin",              q:"Stairway to Heaven Led Zeppelin",      era:"60s70s" },
+  { title:"Imagine",                     artist:"John Lennon",               q:"Imagine John Lennon",                  era:"60s70s" },
+  { title:"Hey Jude",                    artist:"The Beatles",               q:"Hey Jude Beatles",                     era:"60s70s" },
+  { title:"Let It Be",                   artist:"The Beatles",               q:"Let It Be Beatles",                    era:"60s70s" },
+  { title:"Purple Haze",                 artist:"Jimi Hendrix",              q:"Purple Haze Jimi Hendrix",             era:"60s70s" },
+  { title:"Respect",                     artist:"Aretha Franklin",           q:"Respect Aretha Franklin",              era:"60s70s" },
+  { title:"Good Vibrations",             artist:"The Beach Boys",            q:"Good Vibrations Beach Boys",           era:"60s70s" },
+  { title:"Superstition",                artist:"Stevie Wonder",             q:"Superstition Stevie Wonder",           era:"60s70s" },
+  { title:"Like a Rolling Stone",        artist:"Bob Dylan",                 q:"Like a Rolling Stone Bob Dylan",       era:"60s70s" },
+  { title:"What's Going On",             artist:"Marvin Gaye",               q:"Whats Going On Marvin Gaye",           era:"60s70s" },
+  { title:"(I Can't Get No) Satisfaction", artist:"The Rolling Stones",      q:"Satisfaction Rolling Stones",          era:"60s70s" },
+  { title:"Dancing Queen",               artist:"ABBA",                      q:"Dancing Queen ABBA",                   era:"60s70s" },
+  { title:"Born to Run",                 artist:"Bruce Springsteen",         q:"Born to Run Bruce Springsteen",        era:"60s70s" },
+  { title:"American Pie",                artist:"Don McLean",                q:"American Pie Don McLean",              era:"60s70s" },
+  { title:"Piano Man",                   artist:"Billy Joel",                q:"Piano Man Billy Joel",                 era:"60s70s" },
+  { title:"Dream On",                    artist:"Aerosmith",                 q:"Dream On Aerosmith",                   era:"60s70s" },
+  { title:"Roxanne",                     artist:"The Police",                q:"Roxanne The Police",                   era:"60s70s" },
+  { title:"Johnny B. Goode",             artist:"Chuck Berry",               q:"Johnny B Goode Chuck Berry",           era:"60s70s" },
+  { title:"Billie Jean",                 artist:"Michael Jackson",           q:"Billie Jean Michael Jackson",          era:"80s90s" },
+  { title:"Sweet Child O' Mine",         artist:"Guns N' Roses",             q:"Sweet Child O Mine Guns N Roses",      era:"80s90s" },
+  { title:"Smells Like Teen Spirit",     artist:"Nirvana",                   q:"Smells Like Teen Spirit Nirvana",      era:"80s90s" },
+  { title:"Take On Me",                  artist:"a-ha",                      q:"Take On Me a-ha",                      era:"80s90s" },
+  { title:"Don't Stop Believin'",        artist:"Journey",                   q:"Dont Stop Believin Journey",           era:"80s90s" },
+  { title:"Every Breath You Take",       artist:"The Police",                q:"Every Breath You Take The Police",     era:"80s90s" },
+  { title:"Jump",                        artist:"Van Halen",                 q:"Jump Van Halen",                       era:"80s90s" },
+  { title:"With or Without You",         artist:"U2",                        q:"With or Without You U2",               era:"80s90s" },
+  { title:"Purple Rain",                 artist:"Prince",                    q:"Purple Rain Prince",                   era:"80s90s" },
+  { title:"Livin' on a Prayer",          artist:"Bon Jovi",                  q:"Livin on a Prayer Bon Jovi",           era:"80s90s" },
+  { title:"Thriller",                    artist:"Michael Jackson",           q:"Thriller Michael Jackson",             era:"80s90s" },
+  { title:"Girls Just Want to Have Fun", artist:"Cyndi Lauper",              q:"Girls Just Want to Have Fun Cyndi Lauper", era:"80s90s" },
+  { title:"Africa",                      artist:"Toto",                      q:"Africa Toto",                          era:"80s90s" },
+  { title:"Everybody Wants to Rule the World", artist:"Tears for Fears",    q:"Everybody Wants to Rule the World Tears for Fears", era:"80s90s" },
+  { title:"Come as You Are",             artist:"Nirvana",                   q:"Come as You Are Nirvana",              era:"80s90s" },
+  { title:"Welcome to the Jungle",       artist:"Guns N' Roses",             q:"Welcome to the Jungle Guns N Roses",   era:"80s90s" },
+  { title:"Losing My Religion",          artist:"R.E.M.",                    q:"Losing My Religion REM",               era:"80s90s" },
+  { title:"Under the Bridge",            artist:"Red Hot Chili Peppers",     q:"Under the Bridge Red Hot Chili Peppers", era:"80s90s" },
+  { title:"No Scrubs",                   artist:"TLC",                       q:"No Scrubs TLC",                        era:"80s90s" },
+  { title:"Waterfalls",                  artist:"TLC",                       q:"Waterfalls TLC",                       era:"80s90s" },
+  { title:"Gangsta's Paradise",          artist:"Coolio",                    q:"Gangstas Paradise Coolio",             era:"80s90s" },
+  { title:"Wannabe",                     artist:"Spice Girls",               q:"Wannabe Spice Girls",                  era:"80s90s" },
+  { title:"...Baby One More Time",       artist:"Britney Spears",            q:"Baby One More Time Britney Spears",    era:"80s90s" },
+  { title:"Creep",                       artist:"Radiohead",                 q:"Creep Radiohead",                      era:"80s90s" },
+  { title:"Black Hole Sun",              artist:"Soundgarden",               q:"Black Hole Sun Soundgarden",           era:"80s90s" },
+  { title:"Crazy in Love",               artist:"Beyoncé",                   q:"Crazy in Love Beyonce",                era:"2000s" },
+  { title:"In Da Club",                  artist:"50 Cent",                   q:"In Da Club 50 Cent",                   era:"2000s" },
+  { title:"Since U Been Gone",           artist:"Kelly Clarkson",            q:"Since U Been Gone Kelly Clarkson",     era:"2000s" },
+  { title:"Hey Ya!",                     artist:"OutKast",                   q:"Hey Ya OutKast",                       era:"2000s" },
+  { title:"Yeah!",                       artist:"Usher",                     q:"Yeah Usher",                           era:"2000s" },
+  { title:"Lose Yourself",               artist:"Eminem",                    q:"Lose Yourself Eminem",                 era:"2000s" },
+  { title:"Umbrella",                    artist:"Rihanna",                   q:"Umbrella Rihanna",                     era:"2000s" },
+  { title:"Rolling in the Deep",         artist:"Adele",                     q:"Rolling in the Deep Adele",            era:"2000s" },
+  { title:"Bad Romance",                 artist:"Lady Gaga",                 q:"Bad Romance Lady Gaga",                era:"2000s" },
+  { title:"Single Ladies",               artist:"Beyoncé",                   q:"Single Ladies Beyonce",                era:"2000s" },
+  { title:"Poker Face",                  artist:"Lady Gaga",                 q:"Poker Face Lady Gaga",                 era:"2000s" },
+  { title:"Gold Digger",                 artist:"Kanye West",                q:"Gold Digger Kanye West",               era:"2000s" },
+  { title:"Boulevard of Broken Dreams",  artist:"Green Day",                 q:"Boulevard of Broken Dreams Green Day", era:"2000s" },
+  { title:"Mr. Brightside",              artist:"The Killers",               q:"Mr Brightside The Killers",            era:"2000s" },
+  { title:"Somebody That I Used to Know", artist:"Gotye",                    q:"Somebody That I Used to Know Gotye",   era:"2000s" },
+  { title:"I Gotta Feeling",             artist:"The Black Eyed Peas",       q:"I Gotta Feeling Black Eyed Peas",      era:"2000s" },
+  { title:"Party in the USA",            artist:"Miley Cyrus",               q:"Party in the USA Miley Cyrus",         era:"2000s" },
+  { title:"Hips Don't Lie",              artist:"Shakira",                   q:"Hips Don't Lie Shakira",               era:"2000s" },
+  { title:"Toxic",                       artist:"Britney Spears",            q:"Toxic Britney Spears",                 era:"2000s" },
+  { title:"SexyBack",                    artist:"Justin Timberlake",         q:"SexyBack Justin Timberlake",           era:"2000s" },
+  { title:"Beautiful Day",               artist:"U2",                        q:"Beautiful Day U2",                     era:"2000s" },
+  { title:"Blinding Lights",             artist:"The Weeknd",                q:"Blinding Lights The Weeknd",           era:"modern" },
+  { title:"Shape of You",                artist:"Ed Sheeran",                q:"Shape of You Ed Sheeran",              era:"modern" },
+  { title:"Uptown Funk",                 artist:"Mark Ronson ft. Bruno Mars", q:"Uptown Funk Mark Ronson Bruno Mars",  era:"modern" },
+  { title:"Happy",                       artist:"Pharrell Williams",         q:"Happy Pharrell Williams",              era:"modern" },
+  { title:"Thinking Out Loud",           artist:"Ed Sheeran",                q:"Thinking Out Loud Ed Sheeran",         era:"modern" },
+  { title:"Stay With Me",                artist:"Sam Smith",                 q:"Stay With Me Sam Smith",               era:"modern" },
+  { title:"Old Town Road",               artist:"Lil Nas X",                 q:"Old Town Road Lil Nas X",              era:"modern" },
+  { title:"drivers license",             artist:"Olivia Rodrigo",            q:"drivers license Olivia Rodrigo",       era:"modern" },
+  { title:"As It Was",                   artist:"Harry Styles",              q:"As It Was Harry Styles",               era:"modern" },
+  { title:"Good 4 U",                    artist:"Olivia Rodrigo",            q:"Good 4 U Olivia Rodrigo",              era:"modern" },
+  { title:"Levitating",                  artist:"Dua Lipa",                  q:"Levitating Dua Lipa",                  era:"modern" },
+  { title:"Watermelon Sugar",            artist:"Harry Styles",              q:"Watermelon Sugar Harry Styles",        era:"modern" },
+  { title:"Dynamite",                    artist:"BTS",                       q:"Dynamite BTS",                         era:"modern" },
+  { title:"Anti-Hero",                   artist:"Taylor Swift",              q:"Anti-Hero Taylor Swift",               era:"modern" },
+  { title:"Flowers",                     artist:"Miley Cyrus",               q:"Flowers Miley Cyrus",                  era:"modern" },
+  { title:"Cruel Summer",                artist:"Taylor Swift",              q:"Cruel Summer Taylor Swift",            era:"modern" },
+  { title:"Shake It Off",                artist:"Taylor Swift",              q:"Shake It Off Taylor Swift",            era:"modern" },
+  { title:"God's Plan",                  artist:"Drake",                     q:"Gods Plan Drake",                      era:"modern" },
+  { title:"Peaches",                     artist:"Justin Bieber",             q:"Peaches Justin Bieber",                era:"modern" },
+  { title:"Montero (Call Me By Your Name)", artist:"Lil Nas X",             q:"Montero Lil Nas X",                    era:"modern" },
+  { title:"Save Your Tears",             artist:"The Weeknd",                q:"Save Your Tears The Weeknd",           era:"modern" },
+  { title:"Shivers",                     artist:"Ed Sheeran",                q:"Shivers Ed Sheeran",                   era:"modern" },
+  { title:"Heat Waves",                  artist:"Glass Animals",             q:"Heat Waves Glass Animals",             era:"modern" },
+  { title:"Unholy",                      artist:"Sam Smith & Kim Petras",    q:"Unholy Sam Smith Kim Petras",          era:"modern" },
+  { title:"Sunflower",                   artist:"Post Malone",               q:"Sunflower Post Malone",                era:"modern" },
+  { title:"Rockstar",                    artist:"Post Malone",               q:"Rockstar Post Malone 21 Savage",       era:"modern" },
+  { title:"bad guy",                     artist:"Billie Eilish",             q:"bad guy Billie Eilish",                era:"modern" },
+  { title:"Therefore I Am",              artist:"Billie Eilish",             q:"Therefore I Am Billie Eilish",         era:"modern" },
+  { title:"Lovely",                      artist:"Billie Eilish & Khalid",    q:"Lovely Billie Eilish Khalid",          era:"modern" },
+  { title:"Calm Down",                   artist:"Rema & Selena Gomez",       q:"Calm Down Rema Selena Gomez",          era:"modern" },
+  { title:"Circles",                     artist:"Post Malone",               q:"Circles Post Malone",                  era:"modern" },
+];
+
+// ── Preview fetch — hits YOUR server, not Spotify directly ───────────────────
+async function fetchPreview(song) {
+  try {
+    const res = await fetch(`/api/preview?q=${encodeURIComponent(song.q)}`);
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    const data = await res.json();
+    return data.previewUrl || 'NO_PREVIEW';
+  } catch (e) {
+    console.error('Preview error:', e);
+    return null;
+  }
+}
+
+// ── Audio engine ──────────────────────────────────────────────────────────────
+let audio = null;
+function getAudio() {
+  if (!audio) { audio = new Audio(); audio.crossOrigin = 'anonymous'; }
+  return audio;
+}
+async function playUrl(url) {
+  const a = getAudio();
+  a.src = url; a.currentTime = 0;
+  try { await a.play(); } catch(e) { console.warn('Autoplay blocked:', e); }
+}
+function stopAudio() {
+  if (audio) { audio.pause(); audio.src = ''; audio.onended = null; }
+}
+
+// ── Game state ────────────────────────────────────────────────────────────────
+const G = {
+  players:[], scores:{}, currentPlayerIdx:0,
+  round:1, totalRounds:10, songs:[], currentSongIdx:0,
+  songGuessed:false, artistGuessed:false,
+  timerInterval:null, timeLeft:15, roundStartTime:null, active:false,
+};
+
+// ── Screens ───────────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ── Setup UI ──────────────────────────────────────────────────────────────────
+let playerCount = 1;
+const DN = ['Player 1','Player 2','Player 3','Player 4','Player 5','Player 6','Player 7','Player 8'];
+
+function showSetup() { playerCount = 1; renderPlayers(); showScreen('setup'); }
+
+function renderPlayers() {
+  const list = document.getElementById('player-list');
+  list.innerHTML = '';
+  for (let i = 0; i < playerCount; i++) {
+    const d = document.createElement('div');
+    d.className = 'player-entry';
+    d.innerHTML = `
+      <div class="player-num">${i+1}</div>
+      <input class="form-input" id="pn${i}" type="text" value="${DN[i]}" placeholder="${DN[i]}" maxlength="20" style="font-family:'DM Sans',sans-serif;">
+      ${playerCount>1?`<button class="remove-player" onclick="removePlayer(${i})">✕</button>`:''}
+    `;
+    list.appendChild(d);
+  }
+  document.getElementById('add-player-btn').style.display = playerCount >= 8 ? 'none' : '';
+}
+
+function addPlayer() { if (playerCount<8){ playerCount++; renderPlayers(); } }
+
+function removePlayer(idx) {
+  const vals = Array.from({length:playerCount},(_,i)=>document.getElementById(`pn${i}`)?.value||DN[i]);
+  vals.splice(idx,1); playerCount--;
+  renderPlayers();
+  vals.forEach((v,i)=>{ const e=document.getElementById(`pn${i}`); if(e) e.value=v; });
+}
+
+// ── Start game ────────────────────────────────────────────────────────────────
+function startGame() {
+  const players = Array.from({length:playerCount},(_,i)=>document.getElementById(`pn${i}`)?.value.trim()||DN[i]);
+  const rounds  = parseInt(document.getElementById('rounds-select').value);
+  const era     = document.getElementById('era-select').value;
+
+  let pool = era==='all' ? [...SONGS] : SONGS.filter(s=>s.era===era);
+  if (pool.length < rounds) pool = [...SONGS];
+  for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+
+  G.players=players; G.scores=Object.fromEntries(players.map(p=>[p,0]));
+  G.round=1; G.totalRounds=rounds; G.songs=pool.slice(0,rounds);
+  G.currentSongIdx=0; G.currentPlayerIdx=0;
+
+  showScreen('game');
+  beginRound();
+}
+
+function replayGame() {
+  G.scores=Object.fromEntries(G.players.map(p=>[p,0]));
+  G.round=1; G.currentSongIdx=0; G.currentPlayerIdx=0;
+  for(let i=G.songs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [G.songs[i],G.songs[j]]=[G.songs[j],G.songs[i]]; }
+  showScreen('game'); beginRound();
+}
+
+// ── Round logic ───────────────────────────────────────────────────────────────
+async function beginRound() {
+  const song=G.songs[G.currentSongIdx];
+  G.songGuessed=false; G.artistGuessed=false; G.active=false; G.timeLeft=15;
+
+  document.getElementById('h-round').textContent=G.round;
+  document.getElementById('h-total').textContent=G.totalRounds;
+
+  const cpArea=document.getElementById('cp-area');
+  cpArea.innerHTML = G.players.length>1
+    ? `<div class="cp-badge"><div class="cp-dot"></div>${G.players[G.currentPlayerIdx]}'s Turn</div>`
+    : '';
+
+  resetGuessInputs();
+  document.getElementById('reveal-area').style.display='none';
+  document.getElementById('next-area').style.display='none';
+  document.getElementById('guess-section').style.display='flex';
+  setTimerUI(15,15); setVinyl('loading'); setStatus('load','⏳ Loading track…');
+  updateScoreboard();
+
+  const preview = await fetchPreview(song);
+
+  if (preview===null) {
+    setVinyl('error'); setStatus('err','⚠ Server error — skipping');
+    document.getElementById('next-area').style.display='block';
+    disableGuess(true); return;
+  }
+  if (preview==='NO_PREVIEW') {
+    setVinyl('error'); setStatus('warn','⚠ No preview available — skipping');
+    disableGuess(true);
+    document.getElementById('next-area').style.display='block';
+    setTimeout(()=>nextRound(), 1800); return;
+  }
+
+  setVinyl('playing'); setStatus('play','▶ Now playing — what song is this?');
+  await playUrl(preview);
+  G.roundStartTime=Date.now(); G.active=true;
+  startTimer();
+  getAudio().onended=()=>{ if(G.active) timeUp(); };
+}
+
+function startTimer() {
+  clearInterval(G.timerInterval);
+  G.timerInterval=setInterval(()=>{
+    if(!G.active) return;
+    G.timeLeft=Math.max(0,15-(Date.now()-G.roundStartTime)/1000);
+    setTimerUI(G.timeLeft,15);
+    if(G.timeLeft<=0){ clearInterval(G.timerInterval); timeUp(); }
+  },80);
+}
+
+function setTimerUI(left,total) {
+  const pct=left/total*100;
+  const fill=document.getElementById('timer-fill');
+  const digs=document.getElementById('timer-digits');
+  fill.style.width=pct+'%';
+  digs.textContent=Math.ceil(left);
+  const cls=left>10?'':left>5?'warn':'danger';
+  fill.className='timer-fill'+(cls?' '+cls:'');
+  digs.className='timer-digits'+(cls?' '+cls:'');
+}
+
+function timeUp() { if(!G.active) return; G.active=false; clearInterval(G.timerInterval); stopAudio(); endRound(); }
+function skipRound() { if(!G.active) return; G.active=false; clearInterval(G.timerInterval); stopAudio(); endRound(); }
+
+function endRound() {
+  const song=G.songs[G.currentSongIdx];
+  disableGuess(true);
+  setVinyl(G.songGuessed||G.artistGuessed?'success':'idle');
+  setStatus('','');
+  const rev=document.getElementById('reveal-area');
+  rev.style.display='block';
+  let b='';
+  if(G.songGuessed)   b+=`<div class="rb rb-song">🎵 Song Correct</div>`;
+  if(G.artistGuessed) b+=`<div class="rb rb-artist">🎤 Artist Correct</div>`;
+  if(!G.songGuessed&&!G.artistGuessed) b+=`<div class="rb rb-none">No points this round</div>`;
+  rev.innerHTML=`<div class="reveal-card"><div class="reveal-eyebrow">The answer was</div><div class="reveal-title">${song.title}</div><div class="reveal-artist">by ${song.artist}</div><div class="reveal-badges">${b}</div></div>`;
+  document.getElementById('next-area').style.display='block';
+  updateScoreboard();
+}
+
+function nextRound() {
+  G.currentSongIdx++; G.round++;
+  if(G.players.length>1) G.currentPlayerIdx=(G.currentPlayerIdx+1)%G.players.length;
+  if(G.currentSongIdx>=G.songs.length){ showResults(); return; }
+  beginRound();
+}
+
+// ── Guessing ──────────────────────────────────────────────────────────────────
+function norm(s){ return s.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
+function fuzzy(g,t){
+  const a=norm(g),b=norm(t);
+  if(!a||a.length<2) return false;
+  if(a===b) return true;
+  if(b.includes(a)&&a.length>=3) return true;
+  if(a.includes(b)&&b.length>=3) return true;
+  if(a.length>=4&&lev(a,b)<=Math.max(1,Math.floor(b.length*0.25))) return true;
+  return false;
+}
+function lev(a,b){
+  const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(__,j)=>j===0?i:0));
+  for(let j=0;j<=n;j++)d[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)
+    d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);
+  return d[m][n];
+}
+function pts(e,t){ return e<=5?(t==='song'?500:300):e<=10?(t==='song'?350:200):(t==='song'?150:100); }
+
+function submitGuess() {
+  if(!G.active) return;
+  const song=G.songs[G.currentSongIdx];
+  const elapsed=(Date.now()-G.roundStartTime)/1000;
+  const sg=document.getElementById('guess-song').value;
+  const ag=document.getElementById('guess-artist').value;
+  const player=G.players[G.currentPlayerIdx];
+  if(!sg.trim()&&!ag.trim()){ showToast('Type a guess!','error'); return; }
+
+  let delta=0;
+  if(!G.songGuessed&&sg.trim()){
+    if(fuzzy(sg,song.title)){
+      G.songGuessed=true; const p=pts(elapsed,'song'); G.scores[player]+=p; delta+=p;
+      markInput('guess-song','correct'); showToast(`🎵 Song! +${p} pts`,'success');
+    } else { markInput('guess-song','wrong'); }
+  }
+  if(!G.artistGuessed&&ag.trim()){
+    if(fuzzy(ag,song.artist)){
+      G.artistGuessed=true; const p=pts(elapsed,'artist'); G.scores[player]+=p; delta+=p;
+      markInput('guess-artist','correct'); showToast(`🎤 Artist! +${p} pts`,'success');
+    } else { markInput('guess-artist','wrong'); }
+  }
+  if(delta) updateScoreboard(player,delta);
+  if(G.songGuessed&&G.artistGuessed){
+    G.active=false; clearInterval(G.timerInterval); stopAudio();
+    setTimeout(endRound,450);
+  }
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('screen-game').classList.contains('active')) submitGuess();
+});
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setVinyl(state){
+  const disc=document.getElementById('vinyl-disc');
+  const center=document.getElementById('vinyl-center');
+  const wrap=document.getElementById('vinyl-player');
+  const icons={loading:'⏳',playing:'▶',success:'✓',error:'✗',idle:'♪'};
+  const cls={loading:'vc-idle',playing:'vc-playing',success:'vc-success',error:'vc-error',idle:'vc-idle'};
+  disc.className='vinyl-disc'+(state==='playing'?' spinning':'');
+  wrap.className='vinyl-player'+(state==='loading'?' fetching':'');
+  center.className=`vinyl-center ${cls[state]||'vc-idle'}`;
+  center.textContent=icons[state]||'♪';
+}
+function setStatus(type,msg){
+  const row=document.getElementById('status-row');
+  if(!msg){row.innerHTML='';return;}
+  const cls={load:'sb-load',play:'sb-play',warn:'sb-warn',err:'sb-err'}[type]||'sb-load';
+  const dot=type==='play'?'<div class="sb-dot"></div>':'';
+  row.innerHTML=`<div class="sbadge ${cls}">${dot}${msg}</div>`;
+}
+function markInput(id,state){
+  const el=document.getElementById(id);
+  el.className='guess-field '+state;
+  if(state==='correct') el.disabled=true;
+  else setTimeout(()=>el.className='guess-field',420);
+}
+function resetGuessInputs(){
+  ['guess-song','guess-artist'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.value='';el.className='guess-field';el.disabled=false;
+  });
+  disableGuess(false);
+}
+function disableGuess(yes){
+  document.getElementById('submit-btn').disabled=yes;
+  document.getElementById('skip-btn').disabled=yes;
+}
+function updateScoreboard(hl=null,delta=0){
+  const sorted=[...G.players].sort((a,b)=>G.scores[b]-G.scores[a]);
+  const cur=G.players[G.currentPlayerIdx];
+  document.getElementById('sb-list').innerHTML=sorted.map((p,i)=>`
+    <div class="sb-row ${p===cur?'active':''}">
+      <div class="sb-rank">${i+1}</div>
+      <div class="sb-name">${p}</div>
+      <div class="sb-pts">${G.scores[p].toLocaleString()}</div>
+      <div class="sb-delta ${p===hl&&delta>0?'show':''}">+${delta}</div>
+    </div>
+  `).join('');
+}
+
+// ── Results ───────────────────────────────────────────────────────────────────
+function showResults(){
+  stopAudio(); showScreen('results');
+  const sorted=[...G.players].sort((a,b)=>G.scores[b]-G.scores[a]);
+  const podium=document.getElementById('podium');
+  if(sorted.length===1){
+    podium.innerHTML=`<div style="text-align:center;font-family:'Bebas Neue',sans-serif;font-size:56px;color:var(--accent);">${sorted[0]} 🏆</div>`;
+  } else {
+    const top=sorted.slice(0,Math.min(3,sorted.length));
+    const order=top.length===2?[top[1],top[0]]:[top[1],top[0],top[2]];
+    const classes=['pod-2','pod-1','pod-3'];
+    const medals=['🥈','🥇','🥉'];
+    podium.innerHTML=order.map((p,i)=>p?`
+      <div class="pod-place ${classes[i]}">
+        <div class="pod-name">${p}</div>
+        <div class="pod-pts">${G.scores[p].toLocaleString()} pts</div>
+        <div class="pod-block">${medals[i]}</div>
+      </div>`:''
+    ).join('');
+  }
+  document.getElementById('final-list').innerHTML=sorted.map((p,i)=>`
+    <div class="final-row">
+      <div class="fr-rank">${i+1}</div>
+      <div class="fr-name">${p}</div>
+      <div class="fr-pts">${G.scores[p].toLocaleString()}</div>
+    </div>
+  `).join('');
+  launchConfetti();
+}
+
+// ── Confetti ──────────────────────────────────────────────────────────────────
+function launchConfetti(){
+  const c=document.getElementById('confetti-canvas'),ctx=c.getContext('2d');
+  c.width=innerWidth;c.height=innerHeight;
+  const cols=['#e8ff47','#ff4d6d','#4dffb4','#ffd166','#ffffff','#b0bec5'];
+  const p=Array.from({length:150},()=>({x:Math.random()*c.width,y:-15,w:Math.random()*9+4,h:Math.random()*5+2,col:cols[Math.floor(Math.random()*cols.length)],vx:(Math.random()-.5)*4,vy:Math.random()*4+2,r:Math.random()*360,rs:(Math.random()-.5)*7}));
+  let f=0;
+  (function draw(){ctx.clearRect(0,0,c.width,c.height);p.forEach(q=>{ctx.save();ctx.translate(q.x,q.y);ctx.rotate(q.r*Math.PI/180);ctx.fillStyle=q.col;ctx.fillRect(-q.w/2,-q.h/2,q.w,q.h);ctx.restore();q.x+=q.vx;q.y+=q.vy;q.r+=q.rs;q.vy+=0.06;});if(++f<200)requestAnimationFrame(draw);else ctx.clearRect(0,0,c.width,c.height);})();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let tT=null;
+function showToast(msg,type='info'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className=`toast show ${type}`;
+  clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),2700);
+}
+
+function confirmQuit(){
+  if(confirm('Quit the current game?')){
+    G.active=false;clearInterval(G.timerInterval);stopAudio();showScreen('home');
+  }
+}
+
+window.addEventListener('DOMContentLoaded',()=>{ renderPlayers(); });
+</script>
+</body>
+</html>
