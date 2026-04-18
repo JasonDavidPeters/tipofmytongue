@@ -556,25 +556,114 @@ function nextRound(){
   beginRound();
 }
 
-// ── Guessing ──────────────────────────────────────────────────────────────────
-function norm(s){return s.toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim();}
-function fuzzy(g,t){
-  const a=norm(g),b=norm(t);
-  if(!a||a.length<2)return false;
-  if(a===b)return true;
-  if(b.includes(a)&&a.length>=3)return true;
-  if(a.includes(b)&&b.length>=3)return true;
-  if(a.length>=4&&lev(a,b)<=Math.max(1,Math.floor(b.length*0.25)))return true;
-  return false;
+// ── Answer matching ────────────────────────────────────────────────────────────
+//
+// Problems we solve:
+//  1. Artist stored as "Bruno Mars" but track has "(Originally Performed By Bruno Mars)"
+//  2. Abbreviated guesses: "bohemian" matching "Bohemian Rhapsody"
+//  3. Small typos: "Brunno Mars" → "Bruno Mars"
+//  4. Articles: "the beatles" = "beatles"
+//  5. Punctuation/special chars: "guns n roses" = "Guns N' Roses"
+//  6. Featuring artists: "Drake ft Future" should match "Drake"
+//  7. Numbers: "24k magic" = "24K Magic"
+
+// Core normaliser — strips everything except letters, digits and spaces
+function norm(s){
+  return (s||'').toLowerCase()
+    .replace(/&/g,' and ')            // & → and
+    .replace(/\+/g,' and ')
+    .replace(/[''`]/g,'')             // smart quotes / apostrophes
+    .replace(/[^a-z0-9 ]/g,' ')       // everything else → space
+    .replace(/\b(the|a|an)\b/g,' ')   // drop leading articles
+    .replace(/\bfeat(uring)?\b.*/,'') // drop "feat. XXX" suffix
+    .replace(/\bft\b.*/,'')           // drop "ft. XXX" suffix
+    .replace(/\s+/g,' ')
+    .trim();
 }
+
+// Tokenise into significant words (drop short stop words)
+const STOP = new Set(['the','a','an','and','or','of','in','on','at','to','is','it','ft','feat']);
+function tokens(s){
+  return norm(s).split(' ').filter(w => w.length >= 2 && !STOP.has(w));
+}
+
+// Levenshtein distance
 function lev(a,b){
-  const m=a.length,n=b.length;
-  const d=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(__,j)=>j===0?i:0));
-  for(let j=0;j<=n;j++)d[0][j]=j;
-  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)
-    d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);
+  const m=a.length, n=b.length;
+  const d=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>j===0?i:0));
+  for(let j=0;j<=n;j++) d[0][j]=j;
+  for(let i=1;i<=m;i++) for(let j=1;j<=n;j++)
+    d[i][j]=a[i-1]===b[j-1] ? d[i-1][j-1] : 1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);
   return d[m][n];
 }
+
+// Fuzzy single-word match — allows 1 typo per ~4 chars
+function wordMatch(a, b){
+  if(a===b) return true;
+  const maxDist = a.length <= 4 ? 0 : a.length <= 7 ? 1 : 2;
+  return lev(a, b) <= maxDist;
+}
+
+// Token-overlap score: what fraction of guess tokens appear in target tokens
+function tokenOverlap(guessTokens, targetTokens){
+  if(!guessTokens.length || !targetTokens.length) return 0;
+  let matched = 0;
+  for(const gt of guessTokens){
+    if(targetTokens.some(tt => wordMatch(gt, tt))) matched++;
+  }
+  return matched / guessTokens.length;
+}
+
+// Main match function — returns true if guess is a good match for target
+function isMatch(guess, target){
+  const gn = norm(guess);
+  const tn = norm(target);
+  if(!gn || gn.length < 2) return false;
+
+  // 1. Exact normalised match
+  if(gn === tn) return true;
+
+  // 2. Substring containment (for abbreviated guesses like "bohemian" → "bohemian rhapsody")
+  if(tn.includes(gn) && gn.length >= 3) return true;
+  if(gn.includes(tn) && tn.length >= 3) return true;
+
+  // 3. Levenshtein on the full normalised strings (catches small typos in short titles)
+  const maxFullDist = Math.max(1, Math.floor(Math.min(gn.length, tn.length) * 0.2));
+  if(lev(gn, tn) <= maxFullDist) return true;
+
+  // 4. Token-based overlap — the most powerful check.
+  //    Requires >60% of guess tokens to appear (fuzzily) in the target.
+  //    This handles: extra words, different ordering, featured artists, etc.
+  const gt = tokens(guess);
+  const tt = tokens(target);
+  if(gt.length > 0 && tokenOverlap(gt, tt) >= 0.6) return true;
+
+  return false;
+}
+
+// Build the full list of acceptable targets for an artist string.
+// Handles featured artists, "The X" → "X", etc.
+function artistVariants(artist){
+  const variants = [artist];
+  // Split on featuring markers — "Drake ft. Future" → also accept "Drake"
+  const primary = artist.split(/\bfeat(uring)?\b|\bft\b|\bwith\b|\band\b|[&,]/i)[0].trim();
+  if(primary && primary !== artist) variants.push(primary);
+  // "The Beatles" → "Beatles"
+  const noThe = artist.replace(/^the\s+/i,'').trim();
+  if(noThe !== artist) variants.push(noThe);
+  return variants;
+}
+
+// Check if a guess matches an artist (tries all variants)
+function matchesArtist(guess, artist){
+  return artistVariants(artist).some(v => isMatch(guess, v));
+}
+
+// Check if a guess matches a song title
+function matchesTitle(guess, title){
+  return isMatch(guess, title);
+}
+
 function pts(e,t){return e<=5?(t==='song'?500:300):e<=10?(t==='song'?350:200):(t==='song'?150:100);}
 
 function submitGuess(){
@@ -587,13 +676,13 @@ function submitGuess(){
   if(!ag.trim()&&!sg.trim()){showToast('Type a guess!','error');return;}
   let delta=0;
   if(!G.artistGuessed&&ag.trim()){
-    if(fuzzy(ag,song.artist)){
+    if(matchesArtist(ag,song.artist)){
       G.artistGuessed=true;const p=pts(elapsed,'artist');G.scores[player]+=p;delta+=p;
       markInput('guess-artist','correct');showToast(`🎤 Artist! +${p} pts`,'success');
     }else{markInput('guess-artist','wrong');}
   }
   if(!G.songGuessed&&sg.trim()){
-    if(fuzzy(sg,song.title)){
+    if(matchesTitle(sg,song.title)){
       G.songGuessed=true;const p=pts(elapsed,'song');G.scores[player]+=p;delta+=p;
       markInput('guess-song','correct');showToast(`🎵 Song! +${p} pts`,'success');
     }else{markInput('guess-song','wrong');}
