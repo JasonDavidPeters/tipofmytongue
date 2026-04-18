@@ -103,21 +103,34 @@ app.get('/api/preview', async (req, res) => {
     }
   }
 
-  // L3: live Deezer search — try karaoke, then instrumental, then bare
+  // L3: live Deezer search — INSTRUMENTAL ONLY
+  // Never fall back to vocal tracks. Only accept results whose title or
+  // title_version confirms the track is vocal-free.
+  const INSTR_KW = [
+    'instrumental','karaoke','backing track','backing version',
+    'minus one','no vocal','no voice','music only',
+    'piano version','orchestra version','orchestral',
+  ];
+  const confirmedInstrumental = (t) => {
+    const v = (t.title_version || '').toLowerCase();
+    const n = (t.title        || '').toLowerCase();
+    return INSTR_KW.some(kw => v.includes(kw) || n.includes(kw));
+  };
+
   const queries = [
     song.deezer_query,
-    `artist:"${song.artist}" track:"${song.title}" instrumental`,
-    `"${song.title}" "${song.artist}"`,
+    `"${song.title}" "${song.artist}" karaoke`,
+    `"${song.title}" "${song.artist}" instrumental`,
   ];
 
   let previewUrl = null;
   for (const q of queries) {
     if (previewUrl) break;
     try {
-      const r    = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=15`);
+      const r    = await fetch(`https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=20`);
       const data = await r.json();
       for (const t of (data.data || [])) {
-        if (t.preview) { previewUrl = t.preview; break; }
+        if (t.preview && confirmedInstrumental(t)) { previewUrl = t.preview; break; }
       }
     } catch (e) {
       console.warn('Deezer search error:', e.message);

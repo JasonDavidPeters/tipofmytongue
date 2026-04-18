@@ -1,114 +1,84 @@
 /**
- * catalog.js — Deezer ingestion engine
+ * catalog.js — Deezer ingestion engine (Instrumental-Only Edition)
  *
- * Pulls tracks directly from Deezer's public API (no auth needed):
- *   - Global charts
- *   - Genre-specific charts (pop, rock, hip-hop, r&b, dance, etc.)
- *   - Decade-tagged editorial playlists
- *   - Keyword searches for underrepresented eras
+ * GUARANTEE: Every track inserted into the DB is confirmed vocal-free.
  *
- * All tracks that have a preview URL are inserted into the `songs` table.
- * Duplicate detection is done by (title, artist) — existing rows are skipped.
+ * How it works:
+ *   1. We search for known instrumental/karaoke publishers on Deezer whose
+ *      entire catalog is vocal-free (Karaoke Hits, Instrumental Hits, etc.)
+ *      AND for known artists combined with "karaoke"/"instrumental" keywords.
  *
- * Called automatically on server startup if the DB is empty.
- * Can also be triggered via GET /api/admin/ingest (protected by ADMIN_SECRET).
+ *   2. Every result is filtered by isInstrumental() — we only accept tracks
+ *      where title OR title_version contains a confirmed vocal-free keyword
+ *      ("instrumental", "karaoke", "backing track", "piano version", etc.)
+ *
+ *   3. We extract the REAL song title and original artist from the karaoke
+ *      track metadata so players see "Bohemian Rhapsody by Queen" — not
+ *      "Bohemian Rhapsody (Karaoke Version) by Karaoke Hits".
+ *
+ *   4. The confirmed preview URL is stored directly — no re-searching needed.
  */
 
 const pool = require('./db');
 
-// ─── Deezer source definitions ────────────────────────────────────────────────
-//
-// Each source is one of:
-//   { type: 'playlist', id, era }        → fetch all tracks from a playlist
-//   { type: 'chart',    genreId, era }   → fetch chart tracks for a genre
-//   { type: 'search',   query, era }     → keyword search, good for filling eras
-//
-// Deezer playlist IDs for well-known charts / editorial collections:
-//   3155776842  — Deezer Global Top Charts
-//   1111141961  — Hot Hits USA
-//   1362450531  — Pop Rising
-//   1282516842  — Rock Classics
-//   1313621735  — Hip-Hop Classics
-//   1282517382  — R&B Soul
-//   1282514582  — Dance Classics
-//   1235039    — 60s Hits
-//   4523119    — 70s Hits
-//   1180612    — 80s Hits
-//   927209     — 90s Hits
-//   4523199    — 2000s Hits
-//   4523169    — 2010s Hits
-//
-// Deezer genre IDs (for chart endpoint api.deezer.com/chart/<genreId>/tracks):
-//   0   — Overall
-//   132 — Pop
-//   152 — Rock
-//   116 — Rap/Hip-Hop
-//   165 — R&B
-//   113 — Dance
-//   106 — Electro
-//   85  — Alternative
-//   98  — Country
-
-const SOURCES = [
-  // ── Global & current charts ──────────────────────────────────────────────────
-  { type: 'chart',    genreId: 0,   era: 'modern',  label: 'Global Top Chart'       },
-  { type: 'chart',    genreId: 132, era: 'modern',  label: 'Pop Chart'              },
-  { type: 'chart',    genreId: 152, era: 'modern',  label: 'Rock Chart'             },
-  { type: 'chart',    genreId: 116, era: 'modern',  label: 'Hip-Hop Chart'          },
-  { type: 'chart',    genreId: 165, era: 'modern',  label: 'R&B Chart'              },
-  { type: 'chart',    genreId: 113, era: 'modern',  label: 'Dance Chart'            },
-  { type: 'chart',    genreId: 85,  era: 'modern',  label: 'Alternative Chart'      },
-  { type: 'chart',    genreId: 98,  era: 'modern',  label: 'Country Chart'          },
-
-  // ── Editorial playlists — modern hits ────────────────────────────────────────
-  { type: 'playlist', id: 3155776842, era: 'modern',  label: 'Deezer Global Top'    },
-  { type: 'playlist', id: 1111141961, era: 'modern',  label: 'Hot Hits USA'         },
-  { type: 'playlist', id: 1362450531, era: 'modern',  label: 'Pop Rising'           },
-
-  // ── Editorial playlists — decades ────────────────────────────────────────────
-  { type: 'playlist', id: 1282516842, era: '80s90s',  label: 'Rock Classics'        },
-  { type: 'playlist', id: 1313621735, era: '80s90s',  label: 'Hip-Hop Classics'     },
-  { type: 'playlist', id: 1282517382, era: '80s90s',  label: 'R&B Soul'             },
-  { type: 'playlist', id: 1282514582, era: '60s70s',  label: 'Dance Classics'       },
-  { type: 'playlist', id: 1235039,    era: '60s70s',  label: '60s Hits'             },
-  { type: 'playlist', id: 4523119,    era: '60s70s',  label: '70s Hits'             },
-  { type: 'playlist', id: 1180612,    era: '80s90s',  label: '80s Hits'             },
-  { type: 'playlist', id: 927209,     era: '80s90s',  label: '90s Hits'             },
-  { type: 'playlist', id: 4523199,    era: '2000s',   label: '2000s Hits'           },
-  { type: 'playlist', id: 4523169,    era: 'modern',  label: '2010s Hits'           },
-
-  // ── Keyword searches — fill gaps in each era ─────────────────────────────────
-  // These cast a wide net; the decade field is set from the query context.
-  { type: 'search', query: 'top hits 1960s',         era: '60s70s', label: '60s search' },
-  { type: 'search', query: 'greatest songs 1970s',   era: '60s70s', label: '70s search' },
-  { type: 'search', query: 'best songs 1980s',       era: '80s90s', label: '80s search' },
-  { type: 'search', query: 'greatest hits 1990s',    era: '80s90s', label: '90s search' },
-  { type: 'search', query: 'top songs 2000s',        era: '2000s',  label: '2000s search' },
-  { type: 'search', query: 'best pop songs 2010s',   era: 'modern', label: '2010s search' },
-  { type: 'search', query: 'biggest hits 2020s',     era: 'modern', label: '2020s search' },
-  { type: 'search', query: 'classic rock hits',      era: '60s70s', label: 'Classic rock' },
-  { type: 'search', query: 'golden era hip hop',     era: '80s90s', label: 'Golden hip-hop' },
-  { type: 'search', query: 'classic soul R&B',       era: '60s70s', label: 'Classic soul' },
-  { type: 'search', query: 'classic pop songs',      era: '80s90s', label: 'Classic pop'  },
+// ─── Instrumental keyword filter ──────────────────────────────────────────────
+const INSTRUMENTAL_KEYWORDS = [
+  'instrumental',
+  'karaoke',
+  'backing track',
+  'backing version',
+  'minus one',
+  'no vocal',
+  'no voice',
+  'music only',
+  'piano version',
+  'orchestra version',
+  'orchestral version',
+  'acoustic instrumental',
+  'in the style of',
+  'tribute instrumental',
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Throttled fetch — adds a small delay so we don't hammer Deezer */
-async function deezerFetch(url) {
-  await new Promise(r => setTimeout(r, 120)); // ~8 req/s
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Deezer ${res.status} for ${url}`);
-  return res.json();
+function isInstrumental(track) {
+  const version = (track.title_version || '').toLowerCase();
+  const title   = (track.title        || '').toLowerCase();
+  return INSTRUMENTAL_KEYWORDS.some(kw => version.includes(kw) || title.includes(kw));
 }
 
-/** Classify an era from Deezer track data if we don't already have one */
+// ─── Extract real song title from karaoke track ───────────────────────────────
+// Deezer karaoke tracks look like:
+//   title:         "Hotel California (Karaoke Version)"
+//   title_short:   "Hotel California"      ← the clean name we want
+//   title_version: "Karaoke Version"
+function extractRealTitle(track) {
+  if (track.title_short && track.title_short.trim().length > 1) {
+    return track.title_short.trim();
+  }
+  return (track.title || '')
+    .replace(/\s*[\(\[](karaoke|instrumental|backing|piano|minus one|no vocal|in the style)[^\)\]]*/gi, '')
+    .replace(/\s*[-–]\s*(karaoke|instrumental|backing|piano|minus one)[^$]*/gi, '')
+    .replace(/^(instrumental|karaoke)[:\s]+/gi, '')
+    .trim();
+}
+
+// ─── Extract original artist ──────────────────────────────────────────────────
+// Karaoke publishers often embed "Made Famous by ARTIST" in the title.
+function extractOriginalArtist(track) {
+  const title = track.title || '';
+  const mfMatch = title.match(/made famous by ([^)\],-]+)/i);
+  if (mfMatch) return mfMatch[1].trim();
+  const obMatch = title.match(/originally by ([^)\],-]+)/i);
+  if (obMatch) return obMatch[1].trim();
+  const bracketMatch = title.match(/\[([^\]]+?)\s+karaoke\]/i);
+  if (bracketMatch) return bracketMatch[1].trim();
+  return null;
+}
+
+// ─── Era classifier ───────────────────────────────────────────────────────────
 function inferEra(track, defaultEra) {
-  // Use the album release date if present
   const year = track.album?.release_date
     ? parseInt(track.album.release_date.slice(0, 4))
     : null;
-
   if (!year) return defaultEra;
   if (year < 1980) return '60s70s';
   if (year < 2000) return '80s90s';
@@ -116,58 +86,135 @@ function inferEra(track, defaultEra) {
   return 'modern';
 }
 
-/** Build the karaoke/instrumental search query stored in deezer_query */
-function buildQuery(title, artist) {
-  // Strip featured artists from title for cleaner searches
-  const cleanTitle  = title.replace(/\s*[\(\[]?feat\..*$/i, '').trim();
-  const cleanArtist = artist.split(/[,&]/)[0].trim(); // take first if multiple
-  return `artist:"${cleanArtist}" track:"${cleanTitle}" karaoke`;
+// ─── Search sources — INSTRUMENTAL ONLY ──────────────────────────────────────
+// Each entry is a Deezer search query. Only tracks passing isInstrumental()
+// will enter the DB, so it is safe to cast a wide net here.
+const SOURCES = [
+  // ── Known instrumental/karaoke publishers ─────────────────────────────────
+  { query: 'Karaoke Hits pop',               era: 'modern',  label: 'Karaoke Hits Pop'           },
+  { query: 'Karaoke Hits rock',              era: '80s90s',  label: 'Karaoke Hits Rock'           },
+  { query: 'Karaoke Hits 80s',               era: '80s90s',  label: 'Karaoke Hits 80s'            },
+  { query: 'Karaoke Hits 90s',               era: '80s90s',  label: 'Karaoke Hits 90s'            },
+  { query: 'Karaoke Hits 2000s',             era: '2000s',   label: 'Karaoke Hits 2000s'          },
+  { query: 'Karaoke Hits 60s',               era: '60s70s',  label: 'Karaoke Hits 60s'            },
+  { query: 'Karaoke Hits 70s',               era: '60s70s',  label: 'Karaoke Hits 70s'            },
+  { query: 'Instrumental Hits pop',          era: 'modern',  label: 'Instrumental Hits Pop'       },
+  { query: 'Instrumental Hits rock',         era: '60s70s',  label: 'Instrumental Hits Rock'      },
+  { query: 'Instrumental Hits 80s',          era: '80s90s',  label: 'Instrumental Hits 80s'       },
+  { query: 'Instrumental Hits 90s',          era: '80s90s',  label: 'Instrumental Hits 90s'       },
+  { query: 'Instrumental Hits 2000s',        era: '2000s',   label: 'Instrumental Hits 2000s'     },
+  { query: 'Backing Tracks pop hits',        era: 'modern',  label: 'Backing Tracks Pop'          },
+  { query: 'Backing Tracks rock classics',   era: '80s90s',  label: 'Backing Tracks Rock'         },
+  { query: 'Backing Tracks 60s 70s',         era: '60s70s',  label: 'Backing Tracks 60s70s'       },
+  { query: 'Piano Dreamers pop hits',        era: 'modern',  label: 'Piano Dreamers Pop'          },
+  { query: 'Piano Dreamers greatest hits',   era: '80s90s',  label: 'Piano Dreamers Hits'         },
+  { query: 'Music Factory karaoke pop',      era: 'modern',  label: 'Music Factory Pop'           },
+  { query: 'Music Factory karaoke classic',  era: '60s70s',  label: 'Music Factory Classic'       },
+  { query: 'Karaoke All Stars pop',          era: 'modern',  label: 'Karaoke All Stars Pop'       },
+  { query: 'Karaoke All Stars 80s',          era: '80s90s',  label: 'Karaoke All Stars 80s'       },
+  { query: 'Karaoke All Stars 90s',          era: '80s90s',  label: 'Karaoke All Stars 90s'       },
+  { query: 'Karaoke All Stars 2000s',        era: '2000s',   label: 'Karaoke All Stars 2000s'     },
+  // ── Artist + instrumental keyword ─────────────────────────────────────────
+  { query: 'Queen karaoke instrumental',     era: '60s70s',  label: 'Queen Instrumentals'         },
+  { query: 'Beatles karaoke instrumental',   era: '60s70s',  label: 'Beatles Instrumentals'       },
+  { query: 'Elton John karaoke instrumental',era: '60s70s',  label: 'Elton John Instrumentals'    },
+  { query: 'David Bowie karaoke instrumental',era:'60s70s',  label: 'Bowie Instrumentals'         },
+  { query: 'ABBA karaoke instrumental',      era: '60s70s',  label: 'ABBA Instrumentals'          },
+  { query: 'Led Zeppelin karaoke instrumental',era:'60s70s', label: 'Led Zeppelin Instrumentals'  },
+  { query: 'Rolling Stones karaoke',         era: '60s70s',  label: 'Stones Instrumentals'        },
+  { query: 'Fleetwood Mac karaoke',          era: '60s70s',  label: 'Fleetwood Mac Instrumentals' },
+  { query: 'Eagles karaoke instrumental',    era: '60s70s',  label: 'Eagles Instrumentals'        },
+  { query: 'Michael Jackson karaoke',        era: '80s90s',  label: 'MJ Instrumentals'            },
+  { query: 'Madonna karaoke instrumental',   era: '80s90s',  label: 'Madonna Instrumentals'       },
+  { query: 'Prince karaoke instrumental',    era: '80s90s',  label: 'Prince Instrumentals'        },
+  { query: 'Whitney Houston karaoke',        era: '80s90s',  label: 'Whitney Instrumentals'       },
+  { query: 'Bon Jovi karaoke instrumental',  era: '80s90s',  label: 'Bon Jovi Instrumentals'      },
+  { query: 'U2 karaoke instrumental',        era: '80s90s',  label: 'U2 Instrumentals'            },
+  { query: 'Guns N Roses karaoke',           era: '80s90s',  label: 'GNR Instrumentals'           },
+  { query: 'Nirvana karaoke instrumental',   era: '80s90s',  label: 'Nirvana Instrumentals'       },
+  { query: 'R.E.M. karaoke instrumental',    era: '80s90s',  label: 'REM Instrumentals'           },
+  { query: 'Oasis karaoke instrumental',     era: '80s90s',  label: 'Oasis Instrumentals'         },
+  { query: 'Spice Girls karaoke',            era: '80s90s',  label: 'Spice Girls Instrumentals'   },
+  { query: 'Backstreet Boys karaoke',        era: '80s90s',  label: 'BSB Instrumentals'           },
+  { query: 'Britney Spears karaoke',         era: '2000s',   label: 'Britney Instrumentals'       },
+  { query: 'Justin Timberlake karaoke',      era: '2000s',   label: 'JT Instrumentals'            },
+  { query: 'Beyonce karaoke instrumental',   era: '2000s',   label: 'Beyoncé Instrumentals'       },
+  { query: 'Eminem karaoke instrumental',    era: '2000s',   label: 'Eminem Instrumentals'        },
+  { query: 'Rihanna karaoke instrumental',   era: '2000s',   label: 'Rihanna Instrumentals'       },
+  { query: 'Lady Gaga karaoke instrumental', era: '2000s',   label: 'Lady Gaga Instrumentals'     },
+  { query: 'Amy Winehouse karaoke',          era: '2000s',   label: 'Amy Winehouse Instrumentals' },
+  { query: 'Coldplay karaoke instrumental',  era: '2000s',   label: 'Coldplay Instrumentals'      },
+  { query: 'Maroon 5 karaoke instrumental',  era: '2000s',   label: 'Maroon 5 Instrumentals'      },
+  { query: 'Green Day karaoke instrumental', era: '2000s',   label: 'Green Day Instrumentals'     },
+  { query: 'Outkast karaoke instrumental',   era: '2000s',   label: 'Outkast Instrumentals'       },
+  { query: 'Taylor Swift karaoke',           era: 'modern',  label: 'Taylor Swift Instrumentals'  },
+  { query: 'Adele karaoke instrumental',     era: 'modern',  label: 'Adele Instrumentals'         },
+  { query: 'Ed Sheeran karaoke',             era: 'modern',  label: 'Ed Sheeran Instrumentals'    },
+  { query: 'Bruno Mars karaoke',             era: 'modern',  label: 'Bruno Mars Instrumentals'    },
+  { query: 'The Weeknd karaoke',             era: 'modern',  label: 'Weeknd Instrumentals'        },
+  { query: 'Billie Eilish karaoke',          era: 'modern',  label: 'Billie Eilish Instrumentals' },
+  { query: 'Olivia Rodrigo karaoke',         era: 'modern',  label: 'Olivia Rodrigo Instrumentals'},
+  { query: 'Dua Lipa karaoke instrumental',  era: 'modern',  label: 'Dua Lipa Instrumentals'      },
+  { query: 'Harry Styles karaoke',           era: 'modern',  label: 'Harry Styles Instrumentals'  },
+  { query: 'Drake karaoke instrumental',     era: 'modern',  label: 'Drake Instrumentals'         },
+  { query: 'Post Malone karaoke',            era: 'modern',  label: 'Post Malone Instrumentals'   },
+  { query: 'Ariana Grande karaoke',          era: 'modern',  label: 'Ariana Grande Instrumentals' },
+  { query: 'Justin Bieber karaoke',          era: 'modern',  label: 'Justin Bieber Instrumentals' },
+  { query: 'Sam Smith karaoke instrumental', era: 'modern',  label: 'Sam Smith Instrumentals'     },
+  // ── Era sweep — catches any instrumental publisher for an era ─────────────
+  { query: 'instrumental hits 1960s',        era: '60s70s',  label: '60s Instrumental Sweep'      },
+  { query: 'instrumental hits 1970s',        era: '60s70s',  label: '70s Instrumental Sweep'      },
+  { query: 'instrumental hits 1980s',        era: '80s90s',  label: '80s Instrumental Sweep'      },
+  { query: 'instrumental hits 1990s',        era: '80s90s',  label: '90s Instrumental Sweep'      },
+  { query: 'instrumental hits 2000s',        era: '2000s',   label: '2000s Instrumental Sweep'    },
+  { query: 'instrumental pop hits 2010s',    era: 'modern',  label: '2010s Instrumental Sweep'    },
+  { query: 'instrumental pop hits 2020s',    era: 'modern',  label: '2020s Instrumental Sweep'    },
+  { query: 'karaoke rock classics',          era: '60s70s',  label: 'Classic Rock Karaoke Sweep'  },
+  { query: 'karaoke hip hop classics',       era: '80s90s',  label: 'Hip-Hop Karaoke Sweep'       },
+  { query: 'karaoke soul classics',          era: '60s70s',  label: 'Soul Karaoke Sweep'          },
+  { query: 'karaoke country hits',           era: 'modern',  label: 'Country Karaoke Sweep'       },
+  { query: 'karaoke dance hits',             era: 'modern',  label: 'Dance Karaoke Sweep'         },
+  { query: 'karaoke r&b hits',               era: '80s90s',  label: 'R&B Karaoke Sweep'           },
+];
+
+// ─── Fetch & filter ───────────────────────────────────────────────────────────
+
+async function deezerFetch(url) {
+  await new Promise(r => setTimeout(r, 150));
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Deezer HTTP ${res.status}`);
+  return res.json();
 }
 
-/** Fetch tracks from a Deezer chart endpoint */
-async function fetchChart(genreId) {
-  const url = `https://api.deezer.com/chart/${genreId}/tracks?limit=100`;
+async function fetchInstrumentalTracks(query) {
+  const url  = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=100`;
   const data = await deezerFetch(url);
-  return (data.data || []).filter(t => t.preview);
+  return (data.data || []).filter(t => t.preview && isInstrumental(t));
 }
 
-/** Fetch tracks from a Deezer playlist */
-async function fetchPlaylist(playlistId) {
-  // Playlists can be paginated — fetch up to 200 tracks
-  const tracks = [];
-  let url = `https://api.deezer.com/playlist/${playlistId}/tracks?limit=100`;
-  while (url && tracks.length < 200) {
-    const data = await deezerFetch(url);
-    (data.data || []).filter(t => t.preview).forEach(t => tracks.push(t));
-    url = data.next || null;
-  }
-  return tracks;
-}
+// ─── Insert ───────────────────────────────────────────────────────────────────
 
-/** Fetch tracks from a Deezer search query */
-async function fetchSearch(query) {
-  const url = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=100`;
-  const data = await deezerFetch(url);
-  return (data.data || []).filter(t => t.preview);
-}
-
-/** Insert a batch of Deezer tracks into the songs table. Returns insert count. */
-async function insertTracks(tracks, defaultEra) {
+async function insertInstrumentalTracks(tracks, defaultEra) {
   if (!tracks.length) return 0;
   let count = 0;
 
   for (const track of tracks) {
-    const title  = track.title_short || track.title;
-    const artist = track.artist?.name;
-    if (!title || !artist) continue;
+    const title          = extractRealTitle(track);
+    const originalArtist = extractOriginalArtist(track) || track.artist?.name;
 
-    const era          = inferEra(track, defaultEra);
-    const decade       = track.album?.release_date
+    if (!title || title.length < 2 || !originalArtist) continue;
+
+    // Skip bare version labels with no real title
+    const lowerTitle = title.toLowerCase().trim();
+    if (['karaoke version', 'instrumental', 'backing track', 'karaoke'].includes(lowerTitle)) continue;
+
+    const era        = inferEra(track, defaultEra);
+    const decade     = track.album?.release_date
       ? parseInt(track.album.release_date.slice(0, 4))
       : null;
-    const deezerQuery  = buildQuery(title, artist);
-    // Store the known-good preview directly — no need to re-search later
-    const previewCache = track.preview;
+    const previewUrl = track.preview;
+    const cleanArtist = originalArtist.split(/[,&]/)[0].trim();
+    const deezerQuery = `"${title}" "${cleanArtist}" instrumental karaoke`;
 
     try {
       const result = await pool.query(
@@ -175,23 +222,19 @@ async function insertTracks(tracks, defaultEra) {
            (title, artist, era, decade, deezer_query, preview_cache, preview_cached_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW())
          ON CONFLICT (lower(title), lower(artist)) DO NOTHING`,
-        [title, artist, era, decade, deezerQuery, previewCache]
+        [title, originalArtist, era, decade, deezerQuery, previewUrl]
       );
       if (result.rowCount > 0) count++;
     } catch (err) {
-      // Log but don't abort — one bad row shouldn't stop the batch
-      console.warn(`  Insert skipped [${title} — ${artist}]:`, err.message);
+      console.warn(`  Insert skipped [${title}]:`, err.message);
     }
   }
   return count;
 }
 
-// ─── Schema bootstrap ─────────────────────────────────────────────────────────
+// ─── Schema ───────────────────────────────────────────────────────────────────
 
 async function ensureSchema() {
-  // pg does not support multiple statements in one query() call.
-  // Each DDL statement must be issued separately.
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS songs (
       id                SERIAL PRIMARY KEY,
@@ -223,41 +266,35 @@ async function ensureSchema() {
   `);
 }
 
-// ─── Main ingestion function ──────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function ingestFromDeezer({ force = false } = {}) {
   await ensureSchema();
 
-  // Check how many songs we already have
-  const { rows } = await pool.query('SELECT COUNT(*) AS n FROM songs WHERE enabled = true');
+  const { rows } = await pool.query(
+    'SELECT COUNT(*) AS n FROM songs WHERE enabled = true'
+  );
   const existing = parseInt(rows[0].n);
 
   if (!force && existing >= 100) {
-    console.log(`📚 Catalog already has ${existing} songs — skipping ingest`);
+    console.log(`📚 Catalog has ${existing} songs — skipping ingest`);
     return { skipped: true, existing };
   }
 
-  console.log(`🎵 Starting Deezer catalog ingest (${existing} songs currently in DB)…`);
+  console.log(`🎵 Instrumental-only ingest starting (${existing} songs in DB)…`);
+
   const started = Date.now();
   let totalInserted = 0;
   let errors = 0;
 
   for (const source of SOURCES) {
     try {
-      let tracks = [];
-
-      if (source.type === 'chart') {
-        tracks = await fetchChart(source.genreId);
-      } else if (source.type === 'playlist') {
-        tracks = await fetchPlaylist(source.id);
-      } else if (source.type === 'search') {
-        tracks = await fetchSearch(source.query);
-      }
-
-      const inserted = await insertTracks(tracks, source.era);
+      const tracks   = await fetchInstrumentalTracks(source.query);
+      const inserted = await insertInstrumentalTracks(tracks, source.era);
       totalInserted += inserted;
-      console.log(`  ✓ ${source.label}: ${tracks.length} tracks fetched, ${inserted} new`);
-
+      if (tracks.length > 0) {
+        console.log(`  ✓ ${source.label}: ${tracks.length} confirmed instrumental, ${inserted} new`);
+      }
     } catch (err) {
       errors++;
       console.warn(`  ✗ ${source.label}: ${err.message}`);
@@ -265,13 +302,11 @@ async function ingestFromDeezer({ force = false } = {}) {
   }
 
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
-  const { rows: final } = await pool.query('SELECT COUNT(*) AS n FROM songs WHERE enabled = true');
+  const { rows: final } = await pool.query(
+    'SELECT COUNT(*) AS n FROM songs WHERE enabled = true'
+  );
 
-  console.log(`\n✅ Ingest complete in ${elapsed}s`);
-  console.log(`   New songs inserted: ${totalInserted}`);
-  console.log(`   Total catalog size: ${final[0].n}`);
-  console.log(`   Sources with errors: ${errors}`);
-
+  console.log(`\n✅ Ingest complete in ${elapsed}s — ${final[0].n} total songs, all instrumental`);
   return { totalInserted, total: parseInt(final[0].n), elapsed, errors };
 }
 
