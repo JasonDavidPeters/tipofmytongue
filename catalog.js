@@ -189,28 +189,37 @@ async function insertTracks(tracks, defaultEra) {
 // ─── Schema bootstrap ─────────────────────────────────────────────────────────
 
 async function ensureSchema() {
+  // pg does not support multiple statements in one query() call.
+  // Each DDL statement must be issued separately.
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS songs (
-      id                 SERIAL PRIMARY KEY,
-      title              TEXT        NOT NULL,
-      artist             TEXT        NOT NULL,
-      era                TEXT        NOT NULL DEFAULT 'modern',
-      decade             SMALLINT,
-      deezer_query       TEXT        NOT NULL,
-      preview_cache      TEXT,
-      preview_cached_at  TIMESTAMPTZ,
-      enabled            BOOLEAN     NOT NULL DEFAULT TRUE,
-      created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      id                SERIAL PRIMARY KEY,
+      title             TEXT        NOT NULL,
+      artist            TEXT        NOT NULL,
+      era               TEXT        NOT NULL DEFAULT 'modern',
+      decade            SMALLINT,
+      deezer_query      TEXT        NOT NULL,
+      preview_cache     TEXT,
+      preview_cached_at TIMESTAMPTZ,
+      enabled           BOOLEAN     NOT NULL DEFAULT TRUE,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 
-      -- Unique constraint prevents duplicate entries
-      CONSTRAINT songs_title_artist_unique UNIQUE (lower(title), lower(artist))
-    );
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_title_artist_unique
+    ON songs (lower(title), lower(artist))
+  `);
 
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_songs_era_enabled
-      ON songs (era, enabled);
+    ON songs (era, enabled)
+  `);
 
+  await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_songs_enabled
-      ON songs (enabled);
+    ON songs (enabled)
   `);
 }
 
