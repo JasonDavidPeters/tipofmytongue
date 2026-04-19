@@ -963,183 +963,551 @@ async function insertTracks(tracks, source) {
 }
 
 // ─── Sources ──────────────────────────────────────────────────────────────────
+// Each artist_lock source has 4 queries using different keyword combos to
+// maximise coverage across Deezer's karaoke publisher catalog.
 const SOURCES = [
-  // POP
-  { query: 'Karaoke Hits pop 2010s',            genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Pop 2010s'  },
-  { query: 'Karaoke Hits pop 2020s',            genre:'pop', era:'modern', decade_min:2020, decade_max:2029, label:'Pop 2020s'  },
-  { query: 'Karaoke Hits pop 2000s',            genre:'pop', era:'2000s',  decade_min:2000, decade_max:2009, label:'Pop 2000s'  },
-  { query: 'Karaoke Hits pop 90s',              genre:'pop', era:'80s90s', decade_min:1990, decade_max:1999, label:'Pop 90s'    },
-  { query: 'Karaoke Hits pop 80s',              genre:'pop', era:'80s90s', decade_min:1980, decade_max:1989, label:'Pop 80s'    },
 
-  { query: 'Taylor Swift karaoke instrumental', genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 1', artist_lock:'Taylor Swift' },
-  { query: 'Taylor Swift karaoke',              genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 2', artist_lock:'Taylor Swift' },
-  { query: 'Taylor Swift backing track',        genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 3', artist_lock:'Taylor Swift' },
-  { query: '"Taylor Swift" instrumental',       genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 4', artist_lock:'Taylor Swift' },
+  // ══ POP — genre sweeps ═══════════════════════════════════════════════════
+  { query: 'Karaoke Hits pop 2010s',             genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Pop 2010s'  },
+  { query: 'Karaoke Hits pop 2020s',             genre:'pop', era:'modern', decade_min:2020, decade_max:2029, label:'Pop 2020s'  },
+  { query: 'Karaoke Hits pop 2000s',             genre:'pop', era:'2000s',  decade_min:2000, decade_max:2009, label:'Pop 2000s'  },
+  { query: 'Karaoke Hits pop 90s',               genre:'pop', era:'80s90s', decade_min:1990, decade_max:1999, label:'Pop 90s'    },
+  { query: 'Karaoke Hits pop 80s',               genre:'pop', era:'80s90s', decade_min:1980, decade_max:1989, label:'Pop 80s'    },
 
-  { query: 'Adele karaoke instrumental',        genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 1', artist_lock:'Adele' },
-  { query: 'Adele karaoke',                     genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 2', artist_lock:'Adele' },
-  { query: 'Adele backing track instrumental',  genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 3', artist_lock:'Adele' },
-  { query: '"Adele" instrumental',              genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 4', artist_lock:'Adele' },
+  // ── Taylor Swift ─────────────────────────────────────────────────────────
+  { query: 'Taylor Swift karaoke instrumental',  genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 1', artist_lock:'Taylor Swift' },
+  { query: 'Taylor Swift karaoke',               genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 2', artist_lock:'Taylor Swift' },
+  { query: 'Taylor Swift backing track',         genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 3', artist_lock:'Taylor Swift' },
+  { query: '"Taylor Swift" instrumental karaoke',genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 4', artist_lock:'Taylor Swift' },
 
-  { query: 'Ed Sheeran karaoke instrumental',   genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 1', artist_lock:'Ed Sheeran' },
-  { query: 'Ed Sheeran karaoke',                genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 2', artist_lock:'Ed Sheeran' },
-  { query: 'Ed Sheeran backing track',          genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 3', artist_lock:'Ed Sheeran' },
+  // ── Adele ────────────────────────────────────────────────────────────────
+  { query: 'Adele karaoke instrumental',         genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 1', artist_lock:'Adele' },
+  { query: 'Adele karaoke',                      genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 2', artist_lock:'Adele' },
+  { query: 'Adele backing track instrumental',   genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 3', artist_lock:'Adele' },
+  { query: '"Adele" instrumental karaoke',       genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 4', artist_lock:'Adele' },
 
-  { query: 'Bruno Mars karaoke instrumental',   genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 1', artist_lock:'Bruno Mars' },
-  { query: 'Bruno Mars karaoke',                genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 2', artist_lock:'Bruno Mars' },
-  { query: 'Bruno Mars backing track',          genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 3', artist_lock:'Bruno Mars' },
+  // ── Ed Sheeran ───────────────────────────────────────────────────────────
+  { query: 'Ed Sheeran karaoke instrumental',    genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 1', artist_lock:'Ed Sheeran' },
+  { query: 'Ed Sheeran karaoke',                 genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 2', artist_lock:'Ed Sheeran' },
+  { query: 'Ed Sheeran backing track',           genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 3', artist_lock:'Ed Sheeran' },
+  { query: '"Ed Sheeran" instrumental karaoke',  genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 4', artist_lock:'Ed Sheeran' },
 
-  { query: 'Billie Eilish karaoke instrumental',genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 1', artist_lock:'Billie Eilish' },
-  { query: 'Billie Eilish karaoke',             genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 2', artist_lock:'Billie Eilish' },
-  { query: 'Billie Eilish backing track',       genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 3', artist_lock:'Billie Eilish' },
+  // ── Bruno Mars ───────────────────────────────────────────────────────────
+  { query: 'Bruno Mars karaoke instrumental',    genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 1', artist_lock:'Bruno Mars' },
+  { query: 'Bruno Mars karaoke',                 genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 2', artist_lock:'Bruno Mars' },
+  { query: 'Bruno Mars backing track',           genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 3', artist_lock:'Bruno Mars' },
+  { query: '"Bruno Mars" instrumental karaoke',  genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 4', artist_lock:'Bruno Mars' },
 
-  { query: 'Olivia Rodrigo karaoke',             genre:'pop', era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 1', artist_lock:'Olivia Rodrigo' },
-  { query: 'Olivia Rodrigo karaoke instrumental',genre:'pop', era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 2', artist_lock:'Olivia Rodrigo' },
+  // ── Billie Eilish ────────────────────────────────────────────────────────
+  { query: 'Billie Eilish karaoke instrumental', genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 1', artist_lock:'Billie Eilish' },
+  { query: 'Billie Eilish karaoke',              genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 2', artist_lock:'Billie Eilish' },
+  { query: 'Billie Eilish backing track',        genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 3', artist_lock:'Billie Eilish' },
+  { query: '"Billie Eilish" instrumental',       genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 4', artist_lock:'Billie Eilish' },
 
-  { query: 'Dua Lipa karaoke instrumental',     genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Dua Lipa 1', artist_lock:'Dua Lipa' },
-  { query: 'Dua Lipa karaoke',                  genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Dua Lipa 2', artist_lock:'Dua Lipa' },
-  { query: 'Dua Lipa backing track',            genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Dua Lipa 3', artist_lock:'Dua Lipa' },
+  // ── Olivia Rodrigo ───────────────────────────────────────────────────────
+  { query: 'Olivia Rodrigo karaoke instrumental',genre:'pop', era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 1', artist_lock:'Olivia Rodrigo' },
+  { query: 'Olivia Rodrigo karaoke',             genre:'pop', era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 2', artist_lock:'Olivia Rodrigo' },
+  { query: 'Olivia Rodrigo backing track',       genre:'pop', era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 3', artist_lock:'Olivia Rodrigo' },
+  { query: '"Olivia Rodrigo" instrumental',      genre:'pop', era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 4', artist_lock:'Olivia Rodrigo' },
 
-  { query: 'Harry Styles karaoke instrumental', genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 1', artist_lock:'Harry Styles' },
-  { query: 'Harry Styles karaoke',              genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 2', artist_lock:'Harry Styles' },
+  // ── Dua Lipa ─────────────────────────────────────────────────────────────
+  { query: 'Dua Lipa karaoke instrumental',      genre:'pop', era:'modern', decade_min:2015, decade_max:2029, label:'Dua Lipa 1', artist_lock:'Dua Lipa' },
+  { query: 'Dua Lipa karaoke',                   genre:'pop', era:'modern', decade_min:2015, decade_max:2029, label:'Dua Lipa 2', artist_lock:'Dua Lipa' },
+  { query: 'Dua Lipa backing track',             genre:'pop', era:'modern', decade_min:2015, decade_max:2029, label:'Dua Lipa 3', artist_lock:'Dua Lipa' },
+  { query: '"Dua Lipa" instrumental karaoke',    genre:'pop', era:'modern', decade_min:2015, decade_max:2029, label:'Dua Lipa 4', artist_lock:'Dua Lipa' },
 
-  { query: 'Ariana Grande karaoke instrumental',genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 1', artist_lock:'Ariana Grande' },
-  { query: 'Ariana Grande karaoke',             genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 2', artist_lock:'Ariana Grande' },
-  { query: 'Ariana Grande backing track',       genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 3', artist_lock:'Ariana Grande' },
+  // ── Harry Styles ─────────────────────────────────────────────────────────
+  { query: 'Harry Styles karaoke instrumental',  genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 1', artist_lock:'Harry Styles' },
+  { query: 'Harry Styles karaoke',               genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 2', artist_lock:'Harry Styles' },
+  { query: 'Harry Styles backing track',         genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 3', artist_lock:'Harry Styles' },
+  { query: '"Harry Styles" instrumental',        genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 4', artist_lock:'Harry Styles' },
 
-  { query: 'Justin Bieber karaoke instrumental',genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Justin Bieber 1', artist_lock:'Justin Bieber' },
-  { query: 'Justin Bieber karaoke',             genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Justin Bieber 2', artist_lock:'Justin Bieber' },
-  { query: 'Justin Bieber backing track',       genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Justin Bieber 3', artist_lock:'Justin Bieber' },
+  // ── Ariana Grande ────────────────────────────────────────────────────────
+  { query: 'Ariana Grande karaoke instrumental', genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 1', artist_lock:'Ariana Grande' },
+  { query: 'Ariana Grande karaoke',              genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 2', artist_lock:'Ariana Grande' },
+  { query: 'Ariana Grande backing track',        genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 3', artist_lock:'Ariana Grande' },
+  { query: '"Ariana Grande" instrumental',       genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 4', artist_lock:'Ariana Grande' },
 
-  { query: 'Lady Gaga karaoke instrumental',    genre:'pop', era:'2000s',  decade_min:2008, decade_max:2015, label:'Lady Gaga',        artist_lock:'Lady Gaga'        },
-  { query: 'Beyonce karaoke instrumental',      genre:'pop', era:'2000s',  decade_min:2003, decade_max:2016, label:'Beyonce',          artist_lock:'Beyonce'          },
-  { query: 'Rihanna karaoke instrumental',      genre:'pop', era:'2000s',  decade_min:2005, decade_max:2016, label:'Rihanna',          artist_lock:'Rihanna'          },
-  { query: 'Britney Spears karaoke',            genre:'pop', era:'2000s',  decade_min:1998, decade_max:2011, label:'Britney Spears',   artist_lock:'Britney Spears'   },
-  { query: 'Justin Timberlake karaoke',         genre:'pop', era:'2000s',  decade_min:2002, decade_max:2018, label:'Justin Timberlake',artist_lock:'Justin Timberlake'},
-  { query: 'Backstreet Boys karaoke',           genre:'pop', era:'80s90s', decade_min:1996, decade_max:2005, label:'Backstreet Boys',  artist_lock:'Backstreet Boys'  },
-  { query: 'NSYNC karaoke instrumental',        genre:'pop', era:'80s90s', decade_min:1996, decade_max:2002, label:'NSYNC',            artist_lock:'NSYNC'            },
-  { query: 'Spice Girls karaoke',               genre:'pop', era:'80s90s', decade_min:1996, decade_max:2001, label:'Spice Girls',      artist_lock:'Spice Girls'      },
-  { query: 'ABBA karaoke instrumental',         genre:'pop', era:'60s70s', decade_min:1972, decade_max:1982, label:'ABBA 1',           artist_lock:'ABBA'             },
-  { query: 'ABBA karaoke',                      genre:'pop', era:'60s70s', decade_min:1972, decade_max:1982, label:'ABBA 2',           artist_lock:'ABBA'             },
-  { query: 'Elton John karaoke instrumental',   genre:'pop', era:'60s70s', decade_min:1970, decade_max:1990, label:'Elton John 1',     artist_lock:'Elton John'       },
-  { query: 'Elton John karaoke',                genre:'pop', era:'60s70s', decade_min:1970, decade_max:1990, label:'Elton John 2',     artist_lock:'Elton John'       },
-  { query: 'Madonna karaoke instrumental',      genre:'pop', era:'80s90s', decade_min:1983, decade_max:2000, label:'Madonna',          artist_lock:'Madonna'          },
+  // ── Justin Bieber ────────────────────────────────────────────────────────
+  { query: 'Justin Bieber karaoke instrumental', genre:'pop', era:'modern', decade_min:2009, decade_max:2029, label:'Justin Bieber 1', artist_lock:'Justin Bieber' },
+  { query: 'Justin Bieber karaoke',              genre:'pop', era:'modern', decade_min:2009, decade_max:2029, label:'Justin Bieber 2', artist_lock:'Justin Bieber' },
+  { query: 'Justin Bieber backing track',        genre:'pop', era:'modern', decade_min:2009, decade_max:2029, label:'Justin Bieber 3', artist_lock:'Justin Bieber' },
+  { query: '"Justin Bieber" instrumental',       genre:'pop', era:'modern', decade_min:2009, decade_max:2029, label:'Justin Bieber 4', artist_lock:'Justin Bieber' },
 
-  // ROCK
-  { query: 'Karaoke Hits rock 90s',             genre:'rock', era:'80s90s', decade_min:1990, decade_max:1999, label:'Rock 90s'   },
-  { query: 'Karaoke Hits rock 80s',             genre:'rock', era:'80s90s', decade_min:1980, decade_max:1989, label:'Rock 80s'   },
-  { query: 'Karaoke Hits rock 2000s',           genre:'rock', era:'2000s',  decade_min:2000, decade_max:2009, label:'Rock 2000s' },
-  { query: 'Guns N Roses karaoke',              genre:'rock', era:'80s90s', decade_min:1987, decade_max:1999, label:'GNR',       artist_lock:"Guns N' Roses" },
-  { query: 'Bon Jovi karaoke instrumental',     genre:'rock', era:'80s90s', decade_min:1984, decade_max:2000, label:'Bon Jovi',  artist_lock:'Bon Jovi'      },
-  { query: 'U2 karaoke instrumental',           genre:'rock', era:'80s90s', decade_min:1980, decade_max:2005, label:'U2',        artist_lock:'U2'            },
-  { query: 'Nirvana karaoke instrumental',      genre:'rock', era:'80s90s', decade_min:1989, decade_max:1999, label:'Nirvana',   artist_lock:'Nirvana'       },
-  { query: 'Pearl Jam karaoke instrumental',    genre:'rock', era:'80s90s', decade_min:1991, decade_max:2002, label:'Pearl Jam', artist_lock:'Pearl Jam'     },
-  { query: 'Oasis karaoke instrumental',        genre:'rock', era:'80s90s', decade_min:1994, decade_max:2009, label:'Oasis',     artist_lock:'Oasis'         },
-  { query: 'Green Day karaoke instrumental',    genre:'rock', era:'2000s',  decade_min:1994, decade_max:2012, label:'Green Day', artist_lock:'Green Day'     },
-  { query: 'Coldplay karaoke instrumental',     genre:'rock', era:'2000s',  decade_min:2000, decade_max:2015, label:'Coldplay 1',artist_lock:'Coldplay'      },
-  { query: 'Coldplay karaoke',                  genre:'rock', era:'2000s',  decade_min:2000, decade_max:2015, label:'Coldplay 2',artist_lock:'Coldplay'      },
-  { query: 'Foo Fighters karaoke',              genre:'rock', era:'2000s',  decade_min:1995, decade_max:2015, label:'Foo Fighters',artist_lock:'Foo Fighters'},
+  // ── Lady Gaga ────────────────────────────────────────────────────────────
+  { query: 'Lady Gaga karaoke instrumental',     genre:'pop', era:'2000s',  decade_min:2008, decade_max:2029, label:'Lady Gaga 1', artist_lock:'Lady Gaga' },
+  { query: 'Lady Gaga karaoke',                  genre:'pop', era:'2000s',  decade_min:2008, decade_max:2029, label:'Lady Gaga 2', artist_lock:'Lady Gaga' },
+  { query: 'Lady Gaga backing track',            genre:'pop', era:'2000s',  decade_min:2008, decade_max:2029, label:'Lady Gaga 3', artist_lock:'Lady Gaga' },
+  { query: '"Lady Gaga" instrumental karaoke',   genre:'pop', era:'2000s',  decade_min:2008, decade_max:2029, label:'Lady Gaga 4', artist_lock:'Lady Gaga' },
 
-  // CLASSIC ROCK
-  { query: 'Queen karaoke instrumental',             genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 1',      artist_lock:'Queen'          },
-  { query: 'Queen karaoke',                          genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 2',      artist_lock:'Queen'          },
-  { query: 'Queen backing track',                    genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 3',      artist_lock:'Queen'          },
-  { query: 'Beatles karaoke instrumental',           genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 1',    artist_lock:'Beatles'        },
-  { query: 'Beatles karaoke',                        genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 2',    artist_lock:'Beatles'        },
-  { query: 'Beatles backing track',                  genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 3',    artist_lock:'Beatles'        },
-  { query: 'Led Zeppelin karaoke instrumental',      genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1982, label:'Led Zeppelin', artist_lock:'Led Zeppelin'   },
-  { query: 'Rolling Stones karaoke',                 genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1982, label:'Stones',       artist_lock:'Rolling Stones' },
-  { query: 'Fleetwood Mac karaoke',                  genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1990, label:'Fleetwood Mac',artist_lock:'Fleetwood Mac'  },
-  { query: 'Eagles karaoke instrumental',            genre:'classic-rock', era:'60s70s', decade_min:1972, decade_max:1982, label:'Eagles',       artist_lock:'Eagles'         },
-  { query: 'David Bowie karaoke instrumental',       genre:'classic-rock', era:'60s70s', decade_min:1969, decade_max:1990, label:'Bowie',        artist_lock:'David Bowie'    },
-  { query: 'Pink Floyd karaoke instrumental',        genre:'classic-rock', era:'60s70s', decade_min:1967, decade_max:1983, label:'Pink Floyd',   artist_lock:'Pink Floyd'     },
-  { query: 'Jimi Hendrix karaoke instrumental',      genre:'classic-rock', era:'60s70s', decade_min:1966, decade_max:1971, label:'Jimi Hendrix', artist_lock:'Jimi Hendrix'   },
-  { query: 'Aerosmith karaoke instrumental',         genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1999, label:'Aerosmith',    artist_lock:'Aerosmith'      },
-  { query: 'AC/DC karaoke instrumental',             genre:'classic-rock', era:'60s70s', decade_min:1975, decade_max:1995, label:'AC/DC',        artist_lock:'AC/DC'          },
-  { query: 'Bruce Springsteen karaoke',              genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1995, label:'Springsteen',  artist_lock:'Bruce Springsteen'},
-  { query: 'Van Halen karaoke instrumental',         genre:'classic-rock', era:'80s90s', decade_min:1978, decade_max:1995, label:'Van Halen',    artist_lock:'Van Halen'      },
+  // ── Beyoncé ──────────────────────────────────────────────────────────────
+  { query: 'Beyonce karaoke instrumental',       genre:'pop', era:'2000s',  decade_min:2003, decade_max:2029, label:'Beyonce 1', artist_lock:'Beyonce' },
+  { query: 'Beyonce karaoke',                    genre:'pop', era:'2000s',  decade_min:2003, decade_max:2029, label:'Beyonce 2', artist_lock:'Beyonce' },
+  { query: 'Beyonce backing track',              genre:'pop', era:'2000s',  decade_min:2003, decade_max:2029, label:'Beyonce 3', artist_lock:'Beyonce' },
+  { query: '"Beyonce" instrumental karaoke',     genre:'pop', era:'2000s',  decade_min:2003, decade_max:2029, label:'Beyonce 4', artist_lock:'Beyonce' },
 
-  // HIP-HOP
-  { query: 'Eminem karaoke instrumental',       genre:'hip-hop', era:'2000s',  decade_min:1999, decade_max:2013, label:'Eminem',         artist_lock:'Eminem'        },
-  { query: 'Drake karaoke instrumental',        genre:'hip-hop', era:'modern', decade_min:2009, decade_max:2029, label:'Drake',          artist_lock:'Drake'         },
-  { query: 'Kanye West karaoke instrumental',   genre:'hip-hop', era:'2000s',  decade_min:2004, decade_max:2016, label:'Kanye West',     artist_lock:'Kanye West'    },
-  { query: 'Jay Z karaoke instrumental',        genre:'hip-hop', era:'2000s',  decade_min:1996, decade_max:2014, label:'Jay-Z',          artist_lock:'Jay-Z'         },
-  { query: 'Kendrick Lamar karaoke',            genre:'hip-hop', era:'modern', decade_min:2011, decade_max:2029, label:'Kendrick Lamar', artist_lock:'Kendrick Lamar'},
-  { query: 'Post Malone karaoke',               genre:'hip-hop', era:'modern', decade_min:2016, decade_max:2029, label:'Post Malone',    artist_lock:'Post Malone'   },
-  { query: 'Lil Nas X karaoke',                 genre:'hip-hop', era:'modern', decade_min:2018, decade_max:2029, label:'Lil Nas X',      artist_lock:'Lil Nas X'     },
+  // ── Rihanna ──────────────────────────────────────────────────────────────
+  { query: 'Rihanna karaoke instrumental',       genre:'pop', era:'2000s',  decade_min:2005, decade_max:2029, label:'Rihanna 1', artist_lock:'Rihanna' },
+  { query: 'Rihanna karaoke',                    genre:'pop', era:'2000s',  decade_min:2005, decade_max:2029, label:'Rihanna 2', artist_lock:'Rihanna' },
+  { query: 'Rihanna backing track',              genre:'pop', era:'2000s',  decade_min:2005, decade_max:2029, label:'Rihanna 3', artist_lock:'Rihanna' },
+  { query: '"Rihanna" instrumental karaoke',     genre:'pop', era:'2000s',  decade_min:2005, decade_max:2029, label:'Rihanna 4', artist_lock:'Rihanna' },
 
-  // 90s RAP
-  { query: 'Tupac karaoke instrumental',               genre:'90s-rap', era:'80s90s', decade_min:1991, decade_max:1999, label:'Tupac',     artist_lock:'2Pac'           },
-  { query: 'Biggie Smalls karaoke instrumental',       genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:1999, label:'Biggie',    artist_lock:'Notorious B.I.G'},
-  { query: 'Snoop Dogg 90s karaoke instrumental',      genre:'90s-rap', era:'80s90s', decade_min:1993, decade_max:1999, label:'Snoop 90s', artist_lock:'Snoop Dogg'    },
-  { query: 'Dr Dre karaoke instrumental 90s',          genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:1999, label:'Dr Dre',    artist_lock:'Dr. Dre'       },
-  { query: 'Nas karaoke instrumental',                 genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Nas',       artist_lock:'Nas'           },
-  { query: 'DMX karaoke instrumental',                 genre:'90s-rap', era:'80s90s', decade_min:1998, decade_max:2003, label:'DMX',       artist_lock:'DMX'           },
-  { query: 'Coolio karaoke instrumental',              genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Coolio',    artist_lock:'Coolio'        },
-  { query: 'Missy Elliott karaoke',                    genre:'90s-rap', era:'80s90s', decade_min:1997, decade_max:2006, label:'Missy',     artist_lock:'Missy Elliott' },
-  { query: 'TLC karaoke instrumental',                 genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2002, label:'TLC',       artist_lock:'TLC'           },
-  { query: 'Warren G karaoke instrumental',            genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Warren G',  artist_lock:'Warren G'      },
+  // ── Britney Spears ───────────────────────────────────────────────────────
+  { query: 'Britney Spears karaoke instrumental',genre:'pop', era:'2000s',  decade_min:1998, decade_max:2011, label:'Britney 1', artist_lock:'Britney Spears' },
+  { query: 'Britney Spears karaoke',             genre:'pop', era:'2000s',  decade_min:1998, decade_max:2011, label:'Britney 2', artist_lock:'Britney Spears' },
+  { query: 'Britney Spears backing track',       genre:'pop', era:'2000s',  decade_min:1998, decade_max:2011, label:'Britney 3', artist_lock:'Britney Spears' },
+  { query: '"Britney Spears" instrumental',      genre:'pop', era:'2000s',  decade_min:1998, decade_max:2011, label:'Britney 4', artist_lock:'Britney Spears' },
 
-  // R&B / SOUL
-  { query: 'Whitney Houston karaoke',           genre:'rnb', era:'80s90s', decade_min:1985, decade_max:2009, label:'Whitney',      artist_lock:'Whitney Houston'},
-  { query: 'Mariah Carey karaoke',              genre:'rnb', era:'80s90s', decade_min:1990, decade_max:2005, label:'Mariah',       artist_lock:'Mariah Carey'  },
-  { query: 'Usher karaoke instrumental',        genre:'rnb', era:'2000s',  decade_min:1997, decade_max:2012, label:'Usher',        artist_lock:'Usher'         },
-  { query: 'Alicia Keys karaoke',               genre:'rnb', era:'2000s',  decade_min:2001, decade_max:2016, label:'Alicia Keys',  artist_lock:'Alicia Keys'   },
-  { query: 'Amy Winehouse karaoke',             genre:'rnb', era:'2000s',  decade_min:2003, decade_max:2011, label:'Amy Winehouse',artist_lock:'Amy Winehouse' },
-  { query: 'The Weeknd karaoke',                genre:'rnb', era:'modern', decade_min:2012, decade_max:2029, label:'The Weeknd',   artist_lock:'The Weeknd'    },
-  { query: 'SZA karaoke instrumental',          genre:'rnb', era:'modern', decade_min:2017, decade_max:2029, label:'SZA',          artist_lock:'SZA'           },
+  // ── Justin Timberlake ────────────────────────────────────────────────────
+  { query: 'Justin Timberlake karaoke instrumental',genre:'pop',era:'2000s',decade_min:2002, decade_max:2018, label:'JT 1', artist_lock:'Justin Timberlake' },
+  { query: 'Justin Timberlake karaoke',          genre:'pop', era:'2000s',  decade_min:2002, decade_max:2018, label:'JT 2', artist_lock:'Justin Timberlake' },
+  { query: 'Justin Timberlake backing track',    genre:'pop', era:'2000s',  decade_min:2002, decade_max:2018, label:'JT 3', artist_lock:'Justin Timberlake' },
+  { query: '"Justin Timberlake" instrumental',   genre:'pop', era:'2000s',  decade_min:2002, decade_max:2018, label:'JT 4', artist_lock:'Justin Timberlake' },
 
-  // SOUL / MOTOWN
-  { query: 'Aretha Franklin karaoke',           genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'Aretha', artist_lock:'Aretha Franklin'},
-  { query: 'Marvin Gaye karaoke',               genre:'soul', era:'60s70s', decade_min:1960, decade_max:1984, label:'Marvin', artist_lock:'Marvin Gaye'    },
-  { query: 'Stevie Wonder karaoke',             genre:'soul', era:'60s70s', decade_min:1963, decade_max:1985, label:'Stevie', artist_lock:'Stevie Wonder'  },
-  { query: 'James Brown karaoke instrumental',  genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'James',  artist_lock:'James Brown'    },
-  { query: 'Otis Redding karaoke',              genre:'soul', era:'60s70s', decade_min:1962, decade_max:1968, label:'Otis',   artist_lock:'Otis Redding'   },
+  // ── Backstreet Boys ──────────────────────────────────────────────────────
+  { query: 'Backstreet Boys karaoke instrumental',genre:'pop',era:'80s90s', decade_min:1996, decade_max:2005, label:'BSB 1', artist_lock:'Backstreet Boys' },
+  { query: 'Backstreet Boys karaoke',            genre:'pop', era:'80s90s', decade_min:1996, decade_max:2005, label:'BSB 2', artist_lock:'Backstreet Boys' },
+  { query: 'Backstreet Boys backing track',      genre:'pop', era:'80s90s', decade_min:1996, decade_max:2005, label:'BSB 3', artist_lock:'Backstreet Boys' },
+  { query: '"Backstreet Boys" instrumental',     genre:'pop', era:'80s90s', decade_min:1996, decade_max:2005, label:'BSB 4', artist_lock:'Backstreet Boys' },
 
-  // COUNTRY
-  { query: 'Shania Twain karaoke instrumental', genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 1', artist_lock:'Shania Twain' },
-  { query: 'Shania Twain karaoke',              genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 2', artist_lock:'Shania Twain' },
-  { query: 'Shania Twain backing track',        genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 3', artist_lock:'Shania Twain' },
-  { query: '"Shania Twain" instrumental',       genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 4', artist_lock:'Shania Twain' },
-  { query: 'Dolly Parton karaoke instrumental', genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly 1',  artist_lock:'Dolly Parton' },
-  { query: 'Dolly Parton karaoke',              genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly 2',  artist_lock:'Dolly Parton' },
-  { query: 'Dolly Parton backing track',        genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly 3',  artist_lock:'Dolly Parton' },
-  { query: 'Johnny Cash karaoke instrumental',  genre:'country', era:'60s70s', decade_min:1955, decade_max:1985, label:'Cash 1',   artist_lock:'Johnny Cash'  },
-  { query: 'Johnny Cash karaoke',               genre:'country', era:'60s70s', decade_min:1955, decade_max:1985, label:'Cash 2',   artist_lock:'Johnny Cash'  },
-  { query: 'Johnny Cash backing track',         genre:'country', era:'60s70s', decade_min:1955, decade_max:1985, label:'Cash 3',   artist_lock:'Johnny Cash'  },
-  { query: 'Garth Brooks karaoke instrumental', genre:'country', era:'80s90s', decade_min:1989, decade_max:2001, label:'Garth 1',  artist_lock:'Garth Brooks' },
-  { query: 'Garth Brooks karaoke',              genre:'country', era:'80s90s', decade_min:1989, decade_max:2001, label:'Garth 2',  artist_lock:'Garth Brooks' },
-  { query: 'Kenny Rogers karaoke',              genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny 1',  artist_lock:'Kenny Rogers' },
-  { query: 'Kenny Rogers backing track',        genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny 2',  artist_lock:'Kenny Rogers' },
-  { query: 'Luke Bryan karaoke instrumental',   genre:'country', era:'modern', decade_min:2007, decade_max:2029, label:'Luke 1',   artist_lock:'Luke Bryan'   },
-  { query: 'Luke Bryan karaoke',                genre:'country', era:'modern', decade_min:2007, decade_max:2029, label:'Luke 2',   artist_lock:'Luke Bryan'   },
-  { query: 'Morgan Wallen karaoke',             genre:'country', era:'modern', decade_min:2018, decade_max:2029, label:'Morgan 1', artist_lock:'Morgan Wallen'},
-  { query: 'Morgan Wallen instrumental',        genre:'country', era:'modern', decade_min:2018, decade_max:2029, label:'Morgan 2', artist_lock:'Morgan Wallen'},
-  { query: 'Karaoke Hits country 80s 90s',      genre:'country', era:'80s90s', decade_min:1980, decade_max:1999, label:'Country 80s-90s' },
-  { query: 'Karaoke Hits country 2000s',        genre:'country', era:'2000s',  decade_min:2000, decade_max:2009, label:'Country 2000s'   },
+  // ── NSYNC ────────────────────────────────────────────────────────────────
+  { query: 'NSYNC karaoke instrumental',         genre:'pop', era:'80s90s', decade_min:1996, decade_max:2002, label:'NSYNC 1', artist_lock:'NSYNC' },
+  { query: 'NSYNC karaoke',                      genre:'pop', era:'80s90s', decade_min:1996, decade_max:2002, label:'NSYNC 2', artist_lock:'NSYNC' },
+  { query: 'NSYNC backing track',                genre:'pop', era:'80s90s', decade_min:1996, decade_max:2002, label:'NSYNC 3', artist_lock:'NSYNC' },
+  { query: '"NSYNC" instrumental karaoke',       genre:'pop', era:'80s90s', decade_min:1996, decade_max:2002, label:'NSYNC 4', artist_lock:'NSYNC' },
 
-  // DANCE
-  { query: 'Daft Punk karaoke instrumental',    genre:'dance', era:'2000s',  decade_min:1997, decade_max:2013, label:'Daft Punk',    artist_lock:'Daft Punk'    },
-  { query: 'Calvin Harris karaoke',             genre:'dance', era:'modern', decade_min:2007, decade_max:2029, label:'Calvin Harris',artist_lock:'Calvin Harris' },
-  { query: 'David Guetta karaoke',              genre:'dance', era:'modern', decade_min:2009, decade_max:2029, label:'David Guetta', artist_lock:'David Guetta'  },
-  { query: 'Avicii karaoke instrumental',       genre:'dance', era:'modern', decade_min:2011, decade_max:2018, label:'Avicii',       artist_lock:'Avicii'        },
-  { query: 'Karaoke dance hits 2000s',          genre:'dance', era:'2000s',  decade_min:2000, decade_max:2009, label:'Dance 2000s'  },
-  { query: 'Karaoke dance hits 2010s',          genre:'dance', era:'modern', decade_min:2010, decade_max:2019, label:'Dance 2010s'  },
+  // ── Spice Girls ──────────────────────────────────────────────────────────
+  { query: 'Spice Girls karaoke instrumental',   genre:'pop', era:'80s90s', decade_min:1996, decade_max:2001, label:'Spice Girls 1', artist_lock:'Spice Girls' },
+  { query: 'Spice Girls karaoke',                genre:'pop', era:'80s90s', decade_min:1996, decade_max:2001, label:'Spice Girls 2', artist_lock:'Spice Girls' },
+  { query: 'Spice Girls backing track',          genre:'pop', era:'80s90s', decade_min:1996, decade_max:2001, label:'Spice Girls 3', artist_lock:'Spice Girls' },
+  { query: '"Spice Girls" instrumental',         genre:'pop', era:'80s90s', decade_min:1996, decade_max:2001, label:'Spice Girls 4', artist_lock:'Spice Girls' },
 
-  // SOUNDTRACKS
-  { query: 'Grease karaoke instrumental',              genre:'soundtracks', era:'60s70s', decade_min:1978, decade_max:1979, label:'Grease'           },
-  { query: 'Dirty Dancing karaoke instrumental',       genre:'soundtracks', era:'80s90s', decade_min:1987, decade_max:1988, label:'Dirty Dancing'    },
-  { query: 'Footloose karaoke instrumental',           genre:'soundtracks', era:'80s90s', decade_min:1984, decade_max:1985, label:'Footloose'        },
-  { query: 'Mamma Mia movie karaoke',                  genre:'soundtracks', era:'modern', decade_min:2008, decade_max:2019, label:'Mamma Mia'        },
-  { query: 'Greatest Showman karaoke',                 genre:'soundtracks', era:'modern', decade_min:2017, decade_max:2018, label:'Greatest Showman' },
-  { query: 'La La Land karaoke instrumental',          genre:'soundtracks', era:'modern', decade_min:2016, decade_max:2017, label:'La La Land'       },
-  { query: 'Encanto karaoke instrumental',             genre:'soundtracks', era:'modern', decade_min:2021, decade_max:2022, label:'Encanto'          },
-  { query: 'Moana karaoke instrumental',               genre:'soundtracks', era:'modern', decade_min:2016, decade_max:2017, label:'Moana'            },
-  { query: 'Frozen karaoke instrumental',              genre:'soundtracks', era:'modern', decade_min:2013, decade_max:2020, label:'Frozen'           },
-  { query: 'Guardians Galaxy karaoke',                 genre:'soundtracks', era:'modern', decade_min:2014, decade_max:2019, label:'Guardians'        },
-  { query: 'Disney karaoke instrumental',              genre:'soundtracks', era:'modern', decade_min:1989, decade_max:2029, label:'Disney Mix'       },
+  // ── ABBA ─────────────────────────────────────────────────────────────────
+  { query: 'ABBA karaoke instrumental',          genre:'pop', era:'60s70s', decade_min:1972, decade_max:1982, label:'ABBA 1', artist_lock:'ABBA' },
+  { query: 'ABBA karaoke',                       genre:'pop', era:'60s70s', decade_min:1972, decade_max:1982, label:'ABBA 2', artist_lock:'ABBA' },
+  { query: 'ABBA backing track',                 genre:'pop', era:'60s70s', decade_min:1972, decade_max:1982, label:'ABBA 3', artist_lock:'ABBA' },
+  { query: '"ABBA" instrumental karaoke',        genre:'pop', era:'60s70s', decade_min:1972, decade_max:1982, label:'ABBA 4', artist_lock:'ABBA' },
+
+  // ── Elton John ───────────────────────────────────────────────────────────
+  { query: 'Elton John karaoke instrumental',    genre:'pop', era:'60s70s', decade_min:1970, decade_max:1995, label:'Elton John 1', artist_lock:'Elton John' },
+  { query: 'Elton John karaoke',                 genre:'pop', era:'60s70s', decade_min:1970, decade_max:1995, label:'Elton John 2', artist_lock:'Elton John' },
+  { query: 'Elton John backing track',           genre:'pop', era:'60s70s', decade_min:1970, decade_max:1995, label:'Elton John 3', artist_lock:'Elton John' },
+  { query: '"Elton John" instrumental karaoke',  genre:'pop', era:'60s70s', decade_min:1970, decade_max:1995, label:'Elton John 4', artist_lock:'Elton John' },
+
+  // ── Madonna ──────────────────────────────────────────────────────────────
+  { query: 'Madonna karaoke instrumental',       genre:'pop', era:'80s90s', decade_min:1983, decade_max:2005, label:'Madonna 1', artist_lock:'Madonna' },
+  { query: 'Madonna karaoke',                    genre:'pop', era:'80s90s', decade_min:1983, decade_max:2005, label:'Madonna 2', artist_lock:'Madonna' },
+  { query: 'Madonna backing track',              genre:'pop', era:'80s90s', decade_min:1983, decade_max:2005, label:'Madonna 3', artist_lock:'Madonna' },
+  { query: '"Madonna" instrumental karaoke',     genre:'pop', era:'80s90s', decade_min:1983, decade_max:2005, label:'Madonna 4', artist_lock:'Madonna' },
+
+  // ══ ROCK ═════════════════════════════════════════════════════════════════
+  { query: 'Karaoke Hits rock 90s',              genre:'rock', era:'80s90s', decade_min:1990, decade_max:1999, label:'Rock 90s'   },
+  { query: 'Karaoke Hits rock 80s',              genre:'rock', era:'80s90s', decade_min:1980, decade_max:1989, label:'Rock 80s'   },
+  { query: 'Karaoke Hits rock 2000s',            genre:'rock', era:'2000s',  decade_min:2000, decade_max:2009, label:'Rock 2000s' },
+
+  // ── Coldplay ─────────────────────────────────────────────────────────────
+  { query: 'Coldplay karaoke instrumental',      genre:'rock', era:'2000s',  decade_min:2000, decade_max:2022, label:'Coldplay 1', artist_lock:'Coldplay' },
+  { query: 'Coldplay karaoke',                   genre:'rock', era:'2000s',  decade_min:2000, decade_max:2022, label:'Coldplay 2', artist_lock:'Coldplay' },
+  { query: 'Coldplay backing track',             genre:'rock', era:'2000s',  decade_min:2000, decade_max:2022, label:'Coldplay 3', artist_lock:'Coldplay' },
+  { query: '"Coldplay" instrumental karaoke',    genre:'rock', era:'2000s',  decade_min:2000, decade_max:2022, label:'Coldplay 4', artist_lock:'Coldplay' },
+
+  // ── Guns N' Roses ────────────────────────────────────────────────────────
+  { query: "Guns N Roses karaoke instrumental",  genre:'rock', era:'80s90s', decade_min:1987, decade_max:1999, label:"GNR 1", artist_lock:"Guns N' Roses" },
+  { query: "Guns N Roses karaoke",               genre:'rock', era:'80s90s', decade_min:1987, decade_max:1999, label:"GNR 2", artist_lock:"Guns N' Roses" },
+  { query: "Guns N Roses backing track",         genre:'rock', era:'80s90s', decade_min:1987, decade_max:1999, label:"GNR 3", artist_lock:"Guns N' Roses" },
+  { query: "Guns Roses instrumental karaoke",    genre:'rock', era:'80s90s', decade_min:1987, decade_max:1999, label:"GNR 4", artist_lock:"Guns N' Roses" },
+
+  // ── Bon Jovi ─────────────────────────────────────────────────────────────
+  { query: 'Bon Jovi karaoke instrumental',      genre:'rock', era:'80s90s', decade_min:1984, decade_max:2005, label:'Bon Jovi 1', artist_lock:'Bon Jovi' },
+  { query: 'Bon Jovi karaoke',                   genre:'rock', era:'80s90s', decade_min:1984, decade_max:2005, label:'Bon Jovi 2', artist_lock:'Bon Jovi' },
+  { query: 'Bon Jovi backing track',             genre:'rock', era:'80s90s', decade_min:1984, decade_max:2005, label:'Bon Jovi 3', artist_lock:'Bon Jovi' },
+  { query: '"Bon Jovi" instrumental karaoke',    genre:'rock', era:'80s90s', decade_min:1984, decade_max:2005, label:'Bon Jovi 4', artist_lock:'Bon Jovi' },
+
+  // ── U2 ───────────────────────────────────────────────────────────────────
+  { query: 'U2 karaoke instrumental',            genre:'rock', era:'80s90s', decade_min:1980, decade_max:2009, label:'U2 1', artist_lock:'U2' },
+  { query: 'U2 karaoke',                         genre:'rock', era:'80s90s', decade_min:1980, decade_max:2009, label:'U2 2', artist_lock:'U2' },
+  { query: 'U2 backing track',                   genre:'rock', era:'80s90s', decade_min:1980, decade_max:2009, label:'U2 3', artist_lock:'U2' },
+  { query: '"U2" rock instrumental karaoke',     genre:'rock', era:'80s90s', decade_min:1980, decade_max:2009, label:'U2 4', artist_lock:'U2' },
+
+  // ── Nirvana ──────────────────────────────────────────────────────────────
+  { query: 'Nirvana karaoke instrumental',       genre:'rock', era:'80s90s', decade_min:1989, decade_max:1999, label:'Nirvana 1', artist_lock:'Nirvana' },
+  { query: 'Nirvana karaoke',                    genre:'rock', era:'80s90s', decade_min:1989, decade_max:1999, label:'Nirvana 2', artist_lock:'Nirvana' },
+  { query: 'Nirvana backing track',              genre:'rock', era:'80s90s', decade_min:1989, decade_max:1999, label:'Nirvana 3', artist_lock:'Nirvana' },
+  { query: '"Nirvana" instrumental karaoke',     genre:'rock', era:'80s90s', decade_min:1989, decade_max:1999, label:'Nirvana 4', artist_lock:'Nirvana' },
+
+  // ── Pearl Jam ────────────────────────────────────────────────────────────
+  { query: 'Pearl Jam karaoke instrumental',     genre:'rock', era:'80s90s', decade_min:1991, decade_max:2009, label:'Pearl Jam 1', artist_lock:'Pearl Jam' },
+  { query: 'Pearl Jam karaoke',                  genre:'rock', era:'80s90s', decade_min:1991, decade_max:2009, label:'Pearl Jam 2', artist_lock:'Pearl Jam' },
+  { query: 'Pearl Jam backing track',            genre:'rock', era:'80s90s', decade_min:1991, decade_max:2009, label:'Pearl Jam 3', artist_lock:'Pearl Jam' },
+  { query: '"Pearl Jam" instrumental karaoke',   genre:'rock', era:'80s90s', decade_min:1991, decade_max:2009, label:'Pearl Jam 4', artist_lock:'Pearl Jam' },
+
+  // ── Oasis ────────────────────────────────────────────────────────────────
+  { query: 'Oasis karaoke instrumental',         genre:'rock', era:'80s90s', decade_min:1994, decade_max:2009, label:'Oasis 1', artist_lock:'Oasis' },
+  { query: 'Oasis karaoke',                      genre:'rock', era:'80s90s', decade_min:1994, decade_max:2009, label:'Oasis 2', artist_lock:'Oasis' },
+  { query: 'Oasis backing track',                genre:'rock', era:'80s90s', decade_min:1994, decade_max:2009, label:'Oasis 3', artist_lock:'Oasis' },
+  { query: '"Oasis" instrumental karaoke',       genre:'rock', era:'80s90s', decade_min:1994, decade_max:2009, label:'Oasis 4', artist_lock:'Oasis' },
+
+  // ── Green Day ────────────────────────────────────────────────────────────
+  { query: 'Green Day karaoke instrumental',     genre:'rock', era:'2000s',  decade_min:1994, decade_max:2020, label:'Green Day 1', artist_lock:'Green Day' },
+  { query: 'Green Day karaoke',                  genre:'rock', era:'2000s',  decade_min:1994, decade_max:2020, label:'Green Day 2', artist_lock:'Green Day' },
+  { query: 'Green Day backing track',            genre:'rock', era:'2000s',  decade_min:1994, decade_max:2020, label:'Green Day 3', artist_lock:'Green Day' },
+  { query: '"Green Day" instrumental karaoke',   genre:'rock', era:'2000s',  decade_min:1994, decade_max:2020, label:'Green Day 4', artist_lock:'Green Day' },
+
+  // ── Foo Fighters ─────────────────────────────────────────────────────────
+  { query: 'Foo Fighters karaoke instrumental',  genre:'rock', era:'2000s',  decade_min:1995, decade_max:2023, label:'Foo Fighters 1', artist_lock:'Foo Fighters' },
+  { query: 'Foo Fighters karaoke',               genre:'rock', era:'2000s',  decade_min:1995, decade_max:2023, label:'Foo Fighters 2', artist_lock:'Foo Fighters' },
+  { query: 'Foo Fighters backing track',         genre:'rock', era:'2000s',  decade_min:1995, decade_max:2023, label:'Foo Fighters 3', artist_lock:'Foo Fighters' },
+  { query: '"Foo Fighters" instrumental',        genre:'rock', era:'2000s',  decade_min:1995, decade_max:2023, label:'Foo Fighters 4', artist_lock:'Foo Fighters' },
+
+  // ══ CLASSIC ROCK ═════════════════════════════════════════════════════════
+
+  // ── Queen ────────────────────────────────────────────────────────────────
+  { query: 'Queen karaoke instrumental',         genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 1', artist_lock:'Queen' },
+  { query: 'Queen karaoke',                      genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 2', artist_lock:'Queen' },
+  { query: 'Queen backing track',                genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 3', artist_lock:'Queen' },
+  { query: '"Queen" rock instrumental karaoke',  genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 4', artist_lock:'Queen' },
+
+  // ── Beatles ──────────────────────────────────────────────────────────────
+  { query: 'Beatles karaoke instrumental',       genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 1', artist_lock:'Beatles' },
+  { query: 'Beatles karaoke',                    genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 2', artist_lock:'Beatles' },
+  { query: 'Beatles backing track',              genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 3', artist_lock:'Beatles' },
+  { query: '"Beatles" instrumental karaoke',     genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 4', artist_lock:'Beatles' },
+
+  // ── Led Zeppelin ─────────────────────────────────────────────────────────
+  { query: 'Led Zeppelin karaoke instrumental',  genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1982, label:'Led Zeppelin 1', artist_lock:'Led Zeppelin' },
+  { query: 'Led Zeppelin karaoke',               genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1982, label:'Led Zeppelin 2', artist_lock:'Led Zeppelin' },
+  { query: 'Led Zeppelin backing track',         genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1982, label:'Led Zeppelin 3', artist_lock:'Led Zeppelin' },
+  { query: '"Led Zeppelin" instrumental',        genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1982, label:'Led Zeppelin 4', artist_lock:'Led Zeppelin' },
+
+  // ── Rolling Stones ───────────────────────────────────────────────────────
+  { query: 'Rolling Stones karaoke instrumental',genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1989, label:'Rolling Stones 1', artist_lock:'Rolling Stones' },
+  { query: 'Rolling Stones karaoke',             genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1989, label:'Rolling Stones 2', artist_lock:'Rolling Stones' },
+  { query: 'Rolling Stones backing track',       genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1989, label:'Rolling Stones 3', artist_lock:'Rolling Stones' },
+  { query: '"Rolling Stones" instrumental',      genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1989, label:'Rolling Stones 4', artist_lock:'Rolling Stones' },
+
+  // ── Fleetwood Mac ────────────────────────────────────────────────────────
+  { query: 'Fleetwood Mac karaoke instrumental', genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1990, label:'Fleetwood Mac 1', artist_lock:'Fleetwood Mac' },
+  { query: 'Fleetwood Mac karaoke',              genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1990, label:'Fleetwood Mac 2', artist_lock:'Fleetwood Mac' },
+  { query: 'Fleetwood Mac backing track',        genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1990, label:'Fleetwood Mac 3', artist_lock:'Fleetwood Mac' },
+  { query: '"Fleetwood Mac" instrumental',       genre:'classic-rock', era:'60s70s', decade_min:1968, decade_max:1990, label:'Fleetwood Mac 4', artist_lock:'Fleetwood Mac' },
+
+  // ── Eagles ───────────────────────────────────────────────────────────────
+  { query: 'Eagles karaoke instrumental',        genre:'classic-rock', era:'60s70s', decade_min:1972, decade_max:1982, label:'Eagles 1', artist_lock:'Eagles' },
+  { query: 'Eagles karaoke',                     genre:'classic-rock', era:'60s70s', decade_min:1972, decade_max:1982, label:'Eagles 2', artist_lock:'Eagles' },
+  { query: 'Eagles backing track',               genre:'classic-rock', era:'60s70s', decade_min:1972, decade_max:1982, label:'Eagles 3', artist_lock:'Eagles' },
+  { query: '"Eagles" rock instrumental karaoke', genre:'classic-rock', era:'60s70s', decade_min:1972, decade_max:1982, label:'Eagles 4', artist_lock:'Eagles' },
+
+  // ── David Bowie ──────────────────────────────────────────────────────────
+  { query: 'David Bowie karaoke instrumental',   genre:'classic-rock', era:'60s70s', decade_min:1969, decade_max:1990, label:'David Bowie 1', artist_lock:'David Bowie' },
+  { query: 'David Bowie karaoke',                genre:'classic-rock', era:'60s70s', decade_min:1969, decade_max:1990, label:'David Bowie 2', artist_lock:'David Bowie' },
+  { query: 'David Bowie backing track',          genre:'classic-rock', era:'60s70s', decade_min:1969, decade_max:1990, label:'David Bowie 3', artist_lock:'David Bowie' },
+  { query: '"David Bowie" instrumental karaoke', genre:'classic-rock', era:'60s70s', decade_min:1969, decade_max:1990, label:'David Bowie 4', artist_lock:'David Bowie' },
+
+  // ── Pink Floyd ───────────────────────────────────────────────────────────
+  { query: 'Pink Floyd karaoke instrumental',    genre:'classic-rock', era:'60s70s', decade_min:1967, decade_max:1994, label:'Pink Floyd 1', artist_lock:'Pink Floyd' },
+  { query: 'Pink Floyd karaoke',                 genre:'classic-rock', era:'60s70s', decade_min:1967, decade_max:1994, label:'Pink Floyd 2', artist_lock:'Pink Floyd' },
+  { query: 'Pink Floyd backing track',           genre:'classic-rock', era:'60s70s', decade_min:1967, decade_max:1994, label:'Pink Floyd 3', artist_lock:'Pink Floyd' },
+  { query: '"Pink Floyd" instrumental karaoke',  genre:'classic-rock', era:'60s70s', decade_min:1967, decade_max:1994, label:'Pink Floyd 4', artist_lock:'Pink Floyd' },
+
+  // ── Jimi Hendrix ─────────────────────────────────────────────────────────
+  { query: 'Jimi Hendrix karaoke instrumental',  genre:'classic-rock', era:'60s70s', decade_min:1966, decade_max:1971, label:'Jimi Hendrix 1', artist_lock:'Jimi Hendrix' },
+  { query: 'Jimi Hendrix karaoke',               genre:'classic-rock', era:'60s70s', decade_min:1966, decade_max:1971, label:'Jimi Hendrix 2', artist_lock:'Jimi Hendrix' },
+  { query: 'Jimi Hendrix backing track',         genre:'classic-rock', era:'60s70s', decade_min:1966, decade_max:1971, label:'Jimi Hendrix 3', artist_lock:'Jimi Hendrix' },
+  { query: '"Jimi Hendrix" instrumental',        genre:'classic-rock', era:'60s70s', decade_min:1966, decade_max:1971, label:'Jimi Hendrix 4', artist_lock:'Jimi Hendrix' },
+
+  // ── Aerosmith ────────────────────────────────────────────────────────────
+  { query: 'Aerosmith karaoke instrumental',     genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:2001, label:'Aerosmith 1', artist_lock:'Aerosmith' },
+  { query: 'Aerosmith karaoke',                  genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:2001, label:'Aerosmith 2', artist_lock:'Aerosmith' },
+  { query: 'Aerosmith backing track',            genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:2001, label:'Aerosmith 3', artist_lock:'Aerosmith' },
+  { query: '"Aerosmith" instrumental karaoke',   genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:2001, label:'Aerosmith 4', artist_lock:'Aerosmith' },
+
+  // ── AC/DC ────────────────────────────────────────────────────────────────
+  { query: 'AC DC karaoke instrumental',         genre:'classic-rock', era:'60s70s', decade_min:1975, decade_max:2000, label:'ACDC 1', artist_lock:'AC/DC' },
+  { query: 'AC DC karaoke',                      genre:'classic-rock', era:'60s70s', decade_min:1975, decade_max:2000, label:'ACDC 2', artist_lock:'AC/DC' },
+  { query: 'ACDC backing track instrumental',    genre:'classic-rock', era:'60s70s', decade_min:1975, decade_max:2000, label:'ACDC 3', artist_lock:'AC/DC' },
+  { query: '"AC/DC" instrumental karaoke',       genre:'classic-rock', era:'60s70s', decade_min:1975, decade_max:2000, label:'ACDC 4', artist_lock:'AC/DC' },
+
+  // ── Bruce Springsteen ────────────────────────────────────────────────────
+  { query: 'Bruce Springsteen karaoke instrumental',genre:'classic-rock',era:'60s70s',decade_min:1973,decade_max:2009, label:'Springsteen 1', artist_lock:'Bruce Springsteen' },
+  { query: 'Bruce Springsteen karaoke',          genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:2009, label:'Springsteen 2', artist_lock:'Bruce Springsteen' },
+  { query: 'Bruce Springsteen backing track',    genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:2009, label:'Springsteen 3', artist_lock:'Bruce Springsteen' },
+  { query: '"Bruce Springsteen" instrumental',   genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:2009, label:'Springsteen 4', artist_lock:'Bruce Springsteen' },
+
+  // ── Van Halen ────────────────────────────────────────────────────────────
+  { query: 'Van Halen karaoke instrumental',     genre:'classic-rock', era:'80s90s', decade_min:1978, decade_max:1995, label:'Van Halen 1', artist_lock:'Van Halen' },
+  { query: 'Van Halen karaoke',                  genre:'classic-rock', era:'80s90s', decade_min:1978, decade_max:1995, label:'Van Halen 2', artist_lock:'Van Halen' },
+  { query: 'Van Halen backing track',            genre:'classic-rock', era:'80s90s', decade_min:1978, decade_max:1995, label:'Van Halen 3', artist_lock:'Van Halen' },
+  { query: '"Van Halen" instrumental karaoke',   genre:'classic-rock', era:'80s90s', decade_min:1978, decade_max:1995, label:'Van Halen 4', artist_lock:'Van Halen' },
+
+  // ══ HIP-HOP ══════════════════════════════════════════════════════════════
+
+  // ── Eminem ───────────────────────────────────────────────────────────────
+  { query: 'Eminem karaoke instrumental',        genre:'hip-hop', era:'2000s',  decade_min:1999, decade_max:2020, label:'Eminem 1', artist_lock:'Eminem' },
+  { query: 'Eminem karaoke',                     genre:'hip-hop', era:'2000s',  decade_min:1999, decade_max:2020, label:'Eminem 2', artist_lock:'Eminem' },
+  { query: 'Eminem backing track',               genre:'hip-hop', era:'2000s',  decade_min:1999, decade_max:2020, label:'Eminem 3', artist_lock:'Eminem' },
+  { query: '"Eminem" instrumental karaoke',      genre:'hip-hop', era:'2000s',  decade_min:1999, decade_max:2020, label:'Eminem 4', artist_lock:'Eminem' },
+
+  // ── Drake ────────────────────────────────────────────────────────────────
+  { query: 'Drake karaoke instrumental',         genre:'hip-hop', era:'modern', decade_min:2009, decade_max:2029, label:'Drake 1', artist_lock:'Drake' },
+  { query: 'Drake karaoke',                      genre:'hip-hop', era:'modern', decade_min:2009, decade_max:2029, label:'Drake 2', artist_lock:'Drake' },
+  { query: 'Drake backing track',                genre:'hip-hop', era:'modern', decade_min:2009, decade_max:2029, label:'Drake 3', artist_lock:'Drake' },
+  { query: '"Drake" rap instrumental karaoke',   genre:'hip-hop', era:'modern', decade_min:2009, decade_max:2029, label:'Drake 4', artist_lock:'Drake' },
+
+  // ── Kanye West ───────────────────────────────────────────────────────────
+  { query: 'Kanye West karaoke instrumental',    genre:'hip-hop', era:'2000s',  decade_min:2004, decade_max:2022, label:'Kanye West 1', artist_lock:'Kanye West' },
+  { query: 'Kanye West karaoke',                 genre:'hip-hop', era:'2000s',  decade_min:2004, decade_max:2022, label:'Kanye West 2', artist_lock:'Kanye West' },
+  { query: 'Kanye West backing track',           genre:'hip-hop', era:'2000s',  decade_min:2004, decade_max:2022, label:'Kanye West 3', artist_lock:'Kanye West' },
+  { query: '"Kanye West" instrumental karaoke',  genre:'hip-hop', era:'2000s',  decade_min:2004, decade_max:2022, label:'Kanye West 4', artist_lock:'Kanye West' },
+
+  // ── Jay-Z ────────────────────────────────────────────────────────────────
+  { query: 'Jay Z karaoke instrumental',         genre:'hip-hop', era:'2000s',  decade_min:1996, decade_max:2020, label:'Jay-Z 1', artist_lock:'Jay-Z' },
+  { query: 'Jay Z karaoke',                      genre:'hip-hop', era:'2000s',  decade_min:1996, decade_max:2020, label:'Jay-Z 2', artist_lock:'Jay-Z' },
+  { query: 'Jay-Z backing track instrumental',   genre:'hip-hop', era:'2000s',  decade_min:1996, decade_max:2020, label:'Jay-Z 3', artist_lock:'Jay-Z' },
+  { query: '"Jay-Z" instrumental karaoke',       genre:'hip-hop', era:'2000s',  decade_min:1996, decade_max:2020, label:'Jay-Z 4', artist_lock:'Jay-Z' },
+
+  // ── Kendrick Lamar ───────────────────────────────────────────────────────
+  { query: 'Kendrick Lamar karaoke instrumental',genre:'hip-hop', era:'modern', decade_min:2011, decade_max:2029, label:'Kendrick 1', artist_lock:'Kendrick Lamar' },
+  { query: 'Kendrick Lamar karaoke',             genre:'hip-hop', era:'modern', decade_min:2011, decade_max:2029, label:'Kendrick 2', artist_lock:'Kendrick Lamar' },
+  { query: 'Kendrick Lamar backing track',       genre:'hip-hop', era:'modern', decade_min:2011, decade_max:2029, label:'Kendrick 3', artist_lock:'Kendrick Lamar' },
+  { query: '"Kendrick Lamar" instrumental',      genre:'hip-hop', era:'modern', decade_min:2011, decade_max:2029, label:'Kendrick 4', artist_lock:'Kendrick Lamar' },
+
+  // ── Post Malone ──────────────────────────────────────────────────────────
+  { query: 'Post Malone karaoke instrumental',   genre:'hip-hop', era:'modern', decade_min:2016, decade_max:2029, label:'Post Malone 1', artist_lock:'Post Malone' },
+  { query: 'Post Malone karaoke',                genre:'hip-hop', era:'modern', decade_min:2016, decade_max:2029, label:'Post Malone 2', artist_lock:'Post Malone' },
+  { query: 'Post Malone backing track',          genre:'hip-hop', era:'modern', decade_min:2016, decade_max:2029, label:'Post Malone 3', artist_lock:'Post Malone' },
+  { query: '"Post Malone" instrumental karaoke', genre:'hip-hop', era:'modern', decade_min:2016, decade_max:2029, label:'Post Malone 4', artist_lock:'Post Malone' },
+
+  // ── Lil Nas X ────────────────────────────────────────────────────────────
+  { query: 'Lil Nas X karaoke instrumental',     genre:'hip-hop', era:'modern', decade_min:2018, decade_max:2029, label:'Lil Nas X 1', artist_lock:'Lil Nas X' },
+  { query: 'Lil Nas X karaoke',                  genre:'hip-hop', era:'modern', decade_min:2018, decade_max:2029, label:'Lil Nas X 2', artist_lock:'Lil Nas X' },
+  { query: 'Lil Nas X backing track',            genre:'hip-hop', era:'modern', decade_min:2018, decade_max:2029, label:'Lil Nas X 3', artist_lock:'Lil Nas X' },
+  { query: '"Lil Nas X" instrumental karaoke',   genre:'hip-hop', era:'modern', decade_min:2018, decade_max:2029, label:'Lil Nas X 4', artist_lock:'Lil Nas X' },
+
+  // ══ 90s RAP ══════════════════════════════════════════════════════════════
+
+  // ── 2Pac ─────────────────────────────────────────────────────────────────
+  { query: 'Tupac karaoke instrumental',         genre:'90s-rap', era:'80s90s', decade_min:1991, decade_max:1999, label:'2Pac 1', artist_lock:'2Pac' },
+  { query: 'Tupac karaoke',                      genre:'90s-rap', era:'80s90s', decade_min:1991, decade_max:1999, label:'2Pac 2', artist_lock:'2Pac' },
+  { query: '2Pac backing track instrumental',    genre:'90s-rap', era:'80s90s', decade_min:1991, decade_max:1999, label:'2Pac 3', artist_lock:'2Pac' },
+  { query: '"2Pac" instrumental karaoke',        genre:'90s-rap', era:'80s90s', decade_min:1991, decade_max:1999, label:'2Pac 4', artist_lock:'2Pac' },
+
+  // ── Biggie ───────────────────────────────────────────────────────────────
+  { query: 'Biggie Smalls karaoke instrumental', genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:1999, label:'Biggie 1', artist_lock:'Notorious B.I.G' },
+  { query: 'Notorious BIG karaoke',              genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:1999, label:'Biggie 2', artist_lock:'Notorious B.I.G' },
+  { query: 'Biggie backing track instrumental',  genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:1999, label:'Biggie 3', artist_lock:'Notorious B.I.G' },
+  { query: 'Notorious BIG instrumental karaoke', genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:1999, label:'Biggie 4', artist_lock:'Notorious B.I.G' },
+
+  // ── Snoop Dogg ───────────────────────────────────────────────────────────
+  { query: 'Snoop Dogg karaoke instrumental 90s',genre:'90s-rap', era:'80s90s', decade_min:1993, decade_max:1999, label:'Snoop 1', artist_lock:'Snoop Dogg' },
+  { query: 'Snoop Dogg karaoke 90s',             genre:'90s-rap', era:'80s90s', decade_min:1993, decade_max:1999, label:'Snoop 2', artist_lock:'Snoop Dogg' },
+  { query: 'Snoop Dogg backing track 90s',       genre:'90s-rap', era:'80s90s', decade_min:1993, decade_max:1999, label:'Snoop 3', artist_lock:'Snoop Dogg' },
+  { query: '"Snoop Dogg" instrumental karaoke',  genre:'90s-rap', era:'80s90s', decade_min:1993, decade_max:1999, label:'Snoop 4', artist_lock:'Snoop Dogg' },
+
+  // ── Dr. Dre ──────────────────────────────────────────────────────────────
+  { query: 'Dr Dre karaoke instrumental',        genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2001, label:'Dr Dre 1', artist_lock:'Dr. Dre' },
+  { query: 'Dr Dre karaoke',                     genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2001, label:'Dr Dre 2', artist_lock:'Dr. Dre' },
+  { query: 'Dr Dre backing track instrumental',  genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2001, label:'Dr Dre 3', artist_lock:'Dr. Dre' },
+  { query: '"Dr Dre" instrumental karaoke',      genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2001, label:'Dr Dre 4', artist_lock:'Dr. Dre' },
+
+  // ── Nas ──────────────────────────────────────────────────────────────────
+  { query: 'Nas karaoke instrumental',           genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2006, label:'Nas 1', artist_lock:'Nas' },
+  { query: 'Nas karaoke',                        genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2006, label:'Nas 2', artist_lock:'Nas' },
+  { query: 'Nas backing track instrumental',     genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2006, label:'Nas 3', artist_lock:'Nas' },
+  { query: '"Nas" rap instrumental karaoke',     genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2006, label:'Nas 4', artist_lock:'Nas' },
+
+  // ── DMX ──────────────────────────────────────────────────────────────────
+  { query: 'DMX karaoke instrumental',           genre:'90s-rap', era:'80s90s', decade_min:1998, decade_max:2006, label:'DMX 1', artist_lock:'DMX' },
+  { query: 'DMX karaoke',                        genre:'90s-rap', era:'80s90s', decade_min:1998, decade_max:2006, label:'DMX 2', artist_lock:'DMX' },
+  { query: 'DMX backing track instrumental',     genre:'90s-rap', era:'80s90s', decade_min:1998, decade_max:2006, label:'DMX 3', artist_lock:'DMX' },
+  { query: '"DMX" instrumental karaoke',         genre:'90s-rap', era:'80s90s', decade_min:1998, decade_max:2006, label:'DMX 4', artist_lock:'DMX' },
+
+  // ── Coolio ───────────────────────────────────────────────────────────────
+  { query: 'Coolio karaoke instrumental',        genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Coolio 1', artist_lock:'Coolio' },
+  { query: 'Coolio karaoke',                     genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Coolio 2', artist_lock:'Coolio' },
+  { query: 'Coolio backing track',               genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Coolio 3', artist_lock:'Coolio' },
+  { query: '"Coolio" instrumental karaoke',      genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Coolio 4', artist_lock:'Coolio' },
+
+  // ── Missy Elliott ────────────────────────────────────────────────────────
+  { query: 'Missy Elliott karaoke instrumental', genre:'90s-rap', era:'80s90s', decade_min:1997, decade_max:2006, label:'Missy 1', artist_lock:'Missy Elliott' },
+  { query: 'Missy Elliott karaoke',              genre:'90s-rap', era:'80s90s', decade_min:1997, decade_max:2006, label:'Missy 2', artist_lock:'Missy Elliott' },
+  { query: 'Missy Elliott backing track',        genre:'90s-rap', era:'80s90s', decade_min:1997, decade_max:2006, label:'Missy 3', artist_lock:'Missy Elliott' },
+  { query: '"Missy Elliott" instrumental',       genre:'90s-rap', era:'80s90s', decade_min:1997, decade_max:2006, label:'Missy 4', artist_lock:'Missy Elliott' },
+
+  // ── TLC ──────────────────────────────────────────────────────────────────
+  { query: 'TLC karaoke instrumental',           genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2002, label:'TLC 1', artist_lock:'TLC' },
+  { query: 'TLC karaoke',                        genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2002, label:'TLC 2', artist_lock:'TLC' },
+  { query: 'TLC backing track instrumental',     genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2002, label:'TLC 3', artist_lock:'TLC' },
+  { query: '"TLC" instrumental karaoke',         genre:'90s-rap', era:'80s90s', decade_min:1992, decade_max:2002, label:'TLC 4', artist_lock:'TLC' },
+
+  // ── Warren G ─────────────────────────────────────────────────────────────
+  { query: 'Warren G karaoke instrumental',      genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Warren G 1', artist_lock:'Warren G' },
+  { query: 'Warren G karaoke',                   genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Warren G 2', artist_lock:'Warren G' },
+  { query: 'Warren G backing track',             genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Warren G 3', artist_lock:'Warren G' },
+  { query: '"Warren G" instrumental karaoke',    genre:'90s-rap', era:'80s90s', decade_min:1994, decade_max:2001, label:'Warren G 4', artist_lock:'Warren G' },
+
+  // ══ R&B / SOUL ═══════════════════════════════════════════════════════════
+
+  // ── Whitney Houston ──────────────────────────────────────────────────────
+  { query: 'Whitney Houston karaoke instrumental',genre:'rnb', era:'80s90s', decade_min:1985, decade_max:2009, label:'Whitney 1', artist_lock:'Whitney Houston' },
+  { query: 'Whitney Houston karaoke',             genre:'rnb', era:'80s90s', decade_min:1985, decade_max:2009, label:'Whitney 2', artist_lock:'Whitney Houston' },
+  { query: 'Whitney Houston backing track',       genre:'rnb', era:'80s90s', decade_min:1985, decade_max:2009, label:'Whitney 3', artist_lock:'Whitney Houston' },
+  { query: '"Whitney Houston" instrumental',      genre:'rnb', era:'80s90s', decade_min:1985, decade_max:2009, label:'Whitney 4', artist_lock:'Whitney Houston' },
+
+  // ── Mariah Carey ─────────────────────────────────────────────────────────
+  { query: 'Mariah Carey karaoke instrumental',  genre:'rnb', era:'80s90s', decade_min:1990, decade_max:2009, label:'Mariah 1', artist_lock:'Mariah Carey' },
+  { query: 'Mariah Carey karaoke',               genre:'rnb', era:'80s90s', decade_min:1990, decade_max:2009, label:'Mariah 2', artist_lock:'Mariah Carey' },
+  { query: 'Mariah Carey backing track',         genre:'rnb', era:'80s90s', decade_min:1990, decade_max:2009, label:'Mariah 3', artist_lock:'Mariah Carey' },
+  { query: '"Mariah Carey" instrumental',        genre:'rnb', era:'80s90s', decade_min:1990, decade_max:2009, label:'Mariah 4', artist_lock:'Mariah Carey' },
+
+  // ── Usher ────────────────────────────────────────────────────────────────
+  { query: 'Usher karaoke instrumental',         genre:'rnb', era:'2000s',  decade_min:1997, decade_max:2016, label:'Usher 1', artist_lock:'Usher' },
+  { query: 'Usher karaoke',                      genre:'rnb', era:'2000s',  decade_min:1997, decade_max:2016, label:'Usher 2', artist_lock:'Usher' },
+  { query: 'Usher backing track instrumental',   genre:'rnb', era:'2000s',  decade_min:1997, decade_max:2016, label:'Usher 3', artist_lock:'Usher' },
+  { query: '"Usher" rnb instrumental karaoke',   genre:'rnb', era:'2000s',  decade_min:1997, decade_max:2016, label:'Usher 4', artist_lock:'Usher' },
+
+  // ── Alicia Keys ──────────────────────────────────────────────────────────
+  { query: 'Alicia Keys karaoke instrumental',   genre:'rnb', era:'2000s',  decade_min:2001, decade_max:2022, label:'Alicia Keys 1', artist_lock:'Alicia Keys' },
+  { query: 'Alicia Keys karaoke',                genre:'rnb', era:'2000s',  decade_min:2001, decade_max:2022, label:'Alicia Keys 2', artist_lock:'Alicia Keys' },
+  { query: 'Alicia Keys backing track',          genre:'rnb', era:'2000s',  decade_min:2001, decade_max:2022, label:'Alicia Keys 3', artist_lock:'Alicia Keys' },
+  { query: '"Alicia Keys" instrumental karaoke', genre:'rnb', era:'2000s',  decade_min:2001, decade_max:2022, label:'Alicia Keys 4', artist_lock:'Alicia Keys' },
+
+  // ── Amy Winehouse ────────────────────────────────────────────────────────
+  { query: 'Amy Winehouse karaoke instrumental', genre:'rnb', era:'2000s',  decade_min:2003, decade_max:2011, label:'Amy Winehouse 1', artist_lock:'Amy Winehouse' },
+  { query: 'Amy Winehouse karaoke',              genre:'rnb', era:'2000s',  decade_min:2003, decade_max:2011, label:'Amy Winehouse 2', artist_lock:'Amy Winehouse' },
+  { query: 'Amy Winehouse backing track',        genre:'rnb', era:'2000s',  decade_min:2003, decade_max:2011, label:'Amy Winehouse 3', artist_lock:'Amy Winehouse' },
+  { query: '"Amy Winehouse" instrumental',       genre:'rnb', era:'2000s',  decade_min:2003, decade_max:2011, label:'Amy Winehouse 4', artist_lock:'Amy Winehouse' },
+
+  // ── The Weeknd ───────────────────────────────────────────────────────────
+  { query: 'The Weeknd karaoke instrumental',    genre:'rnb', era:'modern', decade_min:2012, decade_max:2029, label:'The Weeknd 1', artist_lock:'The Weeknd' },
+  { query: 'The Weeknd karaoke',                 genre:'rnb', era:'modern', decade_min:2012, decade_max:2029, label:'The Weeknd 2', artist_lock:'The Weeknd' },
+  { query: 'The Weeknd backing track',           genre:'rnb', era:'modern', decade_min:2012, decade_max:2029, label:'The Weeknd 3', artist_lock:'The Weeknd' },
+  { query: '"The Weeknd" instrumental karaoke',  genre:'rnb', era:'modern', decade_min:2012, decade_max:2029, label:'The Weeknd 4', artist_lock:'The Weeknd' },
+
+  // ── SZA ──────────────────────────────────────────────────────────────────
+  { query: 'SZA karaoke instrumental',           genre:'rnb', era:'modern', decade_min:2017, decade_max:2029, label:'SZA 1', artist_lock:'SZA' },
+  { query: 'SZA karaoke',                        genre:'rnb', era:'modern', decade_min:2017, decade_max:2029, label:'SZA 2', artist_lock:'SZA' },
+  { query: 'SZA backing track instrumental',     genre:'rnb', era:'modern', decade_min:2017, decade_max:2029, label:'SZA 3', artist_lock:'SZA' },
+  { query: '"SZA" rnb instrumental karaoke',     genre:'rnb', era:'modern', decade_min:2017, decade_max:2029, label:'SZA 4', artist_lock:'SZA' },
+
+  // ══ SOUL / MOTOWN ════════════════════════════════════════════════════════
+
+  // ── Aretha Franklin ──────────────────────────────────────────────────────
+  { query: 'Aretha Franklin karaoke instrumental',genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'Aretha 1', artist_lock:'Aretha Franklin' },
+  { query: 'Aretha Franklin karaoke',             genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'Aretha 2', artist_lock:'Aretha Franklin' },
+  { query: 'Aretha Franklin backing track',       genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'Aretha 3', artist_lock:'Aretha Franklin' },
+  { query: '"Aretha Franklin" instrumental',      genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'Aretha 4', artist_lock:'Aretha Franklin' },
+
+  // ── Marvin Gaye ──────────────────────────────────────────────────────────
+  { query: 'Marvin Gaye karaoke instrumental',   genre:'soul', era:'60s70s', decade_min:1960, decade_max:1984, label:'Marvin Gaye 1', artist_lock:'Marvin Gaye' },
+  { query: 'Marvin Gaye karaoke',                genre:'soul', era:'60s70s', decade_min:1960, decade_max:1984, label:'Marvin Gaye 2', artist_lock:'Marvin Gaye' },
+  { query: 'Marvin Gaye backing track',          genre:'soul', era:'60s70s', decade_min:1960, decade_max:1984, label:'Marvin Gaye 3', artist_lock:'Marvin Gaye' },
+  { query: '"Marvin Gaye" instrumental karaoke', genre:'soul', era:'60s70s', decade_min:1960, decade_max:1984, label:'Marvin Gaye 4', artist_lock:'Marvin Gaye' },
+
+  // ── Stevie Wonder ────────────────────────────────────────────────────────
+  { query: 'Stevie Wonder karaoke instrumental', genre:'soul', era:'60s70s', decade_min:1963, decade_max:1989, label:'Stevie Wonder 1', artist_lock:'Stevie Wonder' },
+  { query: 'Stevie Wonder karaoke',              genre:'soul', era:'60s70s', decade_min:1963, decade_max:1989, label:'Stevie Wonder 2', artist_lock:'Stevie Wonder' },
+  { query: 'Stevie Wonder backing track',        genre:'soul', era:'60s70s', decade_min:1963, decade_max:1989, label:'Stevie Wonder 3', artist_lock:'Stevie Wonder' },
+  { query: '"Stevie Wonder" instrumental',       genre:'soul', era:'60s70s', decade_min:1963, decade_max:1989, label:'Stevie Wonder 4', artist_lock:'Stevie Wonder' },
+
+  // ── James Brown ──────────────────────────────────────────────────────────
+  { query: 'James Brown karaoke instrumental',   genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'James Brown 1', artist_lock:'James Brown' },
+  { query: 'James Brown karaoke',                genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'James Brown 2', artist_lock:'James Brown' },
+  { query: 'James Brown backing track',          genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'James Brown 3', artist_lock:'James Brown' },
+  { query: '"James Brown" instrumental karaoke', genre:'soul', era:'60s70s', decade_min:1960, decade_max:1985, label:'James Brown 4', artist_lock:'James Brown' },
+
+  // ── Otis Redding ─────────────────────────────────────────────────────────
+  { query: 'Otis Redding karaoke instrumental',  genre:'soul', era:'60s70s', decade_min:1962, decade_max:1968, label:'Otis Redding 1', artist_lock:'Otis Redding' },
+  { query: 'Otis Redding karaoke',               genre:'soul', era:'60s70s', decade_min:1962, decade_max:1968, label:'Otis Redding 2', artist_lock:'Otis Redding' },
+  { query: 'Otis Redding backing track',         genre:'soul', era:'60s70s', decade_min:1962, decade_max:1968, label:'Otis Redding 3', artist_lock:'Otis Redding' },
+  { query: '"Otis Redding" instrumental',        genre:'soul', era:'60s70s', decade_min:1962, decade_max:1968, label:'Otis Redding 4', artist_lock:'Otis Redding' },
+
+  // ══ COUNTRY ══════════════════════════════════════════════════════════════
+  { query: 'Karaoke Hits country 80s 90s',       genre:'country', era:'80s90s', decade_min:1980, decade_max:1999, label:'Country 80s-90s' },
+  { query: 'Karaoke Hits country 2000s',         genre:'country', era:'2000s',  decade_min:2000, decade_max:2009, label:'Country 2000s'   },
+
+  // ── Shania Twain ─────────────────────────────────────────────────────────
+  { query: 'Shania Twain karaoke instrumental',  genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 1', artist_lock:'Shania Twain' },
+  { query: 'Shania Twain karaoke',               genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 2', artist_lock:'Shania Twain' },
+  { query: 'Shania Twain backing track',         genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 3', artist_lock:'Shania Twain' },
+  { query: '"Shania Twain" instrumental karaoke',genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania 4', artist_lock:'Shania Twain' },
+
+  // ── Dolly Parton ─────────────────────────────────────────────────────────
+  { query: 'Dolly Parton karaoke instrumental',  genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly 1', artist_lock:'Dolly Parton' },
+  { query: 'Dolly Parton karaoke',               genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly 2', artist_lock:'Dolly Parton' },
+  { query: 'Dolly Parton backing track',         genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly 3', artist_lock:'Dolly Parton' },
+  { query: '"Dolly Parton" instrumental karaoke',genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly 4', artist_lock:'Dolly Parton' },
+
+  // ── Johnny Cash ──────────────────────────────────────────────────────────
+  { query: 'Johnny Cash karaoke instrumental',   genre:'country', era:'60s70s', decade_min:1955, decade_max:2003, label:'Cash 1', artist_lock:'Johnny Cash' },
+  { query: 'Johnny Cash karaoke',                genre:'country', era:'60s70s', decade_min:1955, decade_max:2003, label:'Cash 2', artist_lock:'Johnny Cash' },
+  { query: 'Johnny Cash backing track',          genre:'country', era:'60s70s', decade_min:1955, decade_max:2003, label:'Cash 3', artist_lock:'Johnny Cash' },
+  { query: '"Johnny Cash" instrumental karaoke', genre:'country', era:'60s70s', decade_min:1955, decade_max:2003, label:'Cash 4', artist_lock:'Johnny Cash' },
+
+  // ── Garth Brooks ─────────────────────────────────────────────────────────
+  { query: 'Garth Brooks karaoke instrumental',  genre:'country', era:'80s90s', decade_min:1989, decade_max:2016, label:'Garth 1', artist_lock:'Garth Brooks' },
+  { query: 'Garth Brooks karaoke',               genre:'country', era:'80s90s', decade_min:1989, decade_max:2016, label:'Garth 2', artist_lock:'Garth Brooks' },
+  { query: 'Garth Brooks backing track',         genre:'country', era:'80s90s', decade_min:1989, decade_max:2016, label:'Garth 3', artist_lock:'Garth Brooks' },
+  { query: '"Garth Brooks" instrumental karaoke',genre:'country', era:'80s90s', decade_min:1989, decade_max:2016, label:'Garth 4', artist_lock:'Garth Brooks' },
+
+  // ── Kenny Rogers ─────────────────────────────────────────────────────────
+  { query: 'Kenny Rogers karaoke instrumental',  genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny 1', artist_lock:'Kenny Rogers' },
+  { query: 'Kenny Rogers karaoke',               genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny 2', artist_lock:'Kenny Rogers' },
+  { query: 'Kenny Rogers backing track',         genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny 3', artist_lock:'Kenny Rogers' },
+  { query: '"Kenny Rogers" instrumental karaoke',genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny 4', artist_lock:'Kenny Rogers' },
+
+  // ── Luke Bryan ───────────────────────────────────────────────────────────
+  { query: 'Luke Bryan karaoke instrumental',    genre:'country', era:'modern', decade_min:2007, decade_max:2029, label:'Luke 1', artist_lock:'Luke Bryan' },
+  { query: 'Luke Bryan karaoke',                 genre:'country', era:'modern', decade_min:2007, decade_max:2029, label:'Luke 2', artist_lock:'Luke Bryan' },
+  { query: 'Luke Bryan backing track',           genre:'country', era:'modern', decade_min:2007, decade_max:2029, label:'Luke 3', artist_lock:'Luke Bryan' },
+  { query: '"Luke Bryan" instrumental karaoke',  genre:'country', era:'modern', decade_min:2007, decade_max:2029, label:'Luke 4', artist_lock:'Luke Bryan' },
+
+  // ── Morgan Wallen ────────────────────────────────────────────────────────
+  { query: 'Morgan Wallen karaoke instrumental', genre:'country', era:'modern', decade_min:2018, decade_max:2029, label:'Morgan 1', artist_lock:'Morgan Wallen' },
+  { query: 'Morgan Wallen karaoke',              genre:'country', era:'modern', decade_min:2018, decade_max:2029, label:'Morgan 2', artist_lock:'Morgan Wallen' },
+  { query: 'Morgan Wallen backing track',        genre:'country', era:'modern', decade_min:2018, decade_max:2029, label:'Morgan 3', artist_lock:'Morgan Wallen' },
+  { query: '"Morgan Wallen" instrumental',       genre:'country', era:'modern', decade_min:2018, decade_max:2029, label:'Morgan 4', artist_lock:'Morgan Wallen' },
+
+  // ══ DANCE / ELECTRONIC ═══════════════════════════════════════════════════
+  { query: 'Karaoke dance hits 2000s',           genre:'dance', era:'2000s',  decade_min:2000, decade_max:2009, label:'Dance 2000s' },
+  { query: 'Karaoke dance hits 2010s',           genre:'dance', era:'modern', decade_min:2010, decade_max:2019, label:'Dance 2010s' },
+
+  // ── Daft Punk ────────────────────────────────────────────────────────────
+  { query: 'Daft Punk karaoke instrumental',     genre:'dance', era:'2000s',  decade_min:1997, decade_max:2013, label:'Daft Punk 1', artist_lock:'Daft Punk' },
+  { query: 'Daft Punk karaoke',                  genre:'dance', era:'2000s',  decade_min:1997, decade_max:2013, label:'Daft Punk 2', artist_lock:'Daft Punk' },
+  { query: 'Daft Punk backing track',            genre:'dance', era:'2000s',  decade_min:1997, decade_max:2013, label:'Daft Punk 3', artist_lock:'Daft Punk' },
+  { query: '"Daft Punk" instrumental karaoke',   genre:'dance', era:'2000s',  decade_min:1997, decade_max:2013, label:'Daft Punk 4', artist_lock:'Daft Punk' },
+
+  // ── Calvin Harris ────────────────────────────────────────────────────────
+  { query: 'Calvin Harris karaoke instrumental', genre:'dance', era:'modern', decade_min:2007, decade_max:2029, label:'Calvin Harris 1', artist_lock:'Calvin Harris' },
+  { query: 'Calvin Harris karaoke',              genre:'dance', era:'modern', decade_min:2007, decade_max:2029, label:'Calvin Harris 2', artist_lock:'Calvin Harris' },
+  { query: 'Calvin Harris backing track',        genre:'dance', era:'modern', decade_min:2007, decade_max:2029, label:'Calvin Harris 3', artist_lock:'Calvin Harris' },
+  { query: '"Calvin Harris" instrumental',       genre:'dance', era:'modern', decade_min:2007, decade_max:2029, label:'Calvin Harris 4', artist_lock:'Calvin Harris' },
+
+  // ── David Guetta ─────────────────────────────────────────────────────────
+  { query: 'David Guetta karaoke instrumental',  genre:'dance', era:'modern', decade_min:2009, decade_max:2029, label:'David Guetta 1', artist_lock:'David Guetta' },
+  { query: 'David Guetta karaoke',               genre:'dance', era:'modern', decade_min:2009, decade_max:2029, label:'David Guetta 2', artist_lock:'David Guetta' },
+  { query: 'David Guetta backing track',         genre:'dance', era:'modern', decade_min:2009, decade_max:2029, label:'David Guetta 3', artist_lock:'David Guetta' },
+  { query: '"David Guetta" instrumental',        genre:'dance', era:'modern', decade_min:2009, decade_max:2029, label:'David Guetta 4', artist_lock:'David Guetta' },
+
+  // ── Avicii ───────────────────────────────────────────────────────────────
+  { query: 'Avicii karaoke instrumental',        genre:'dance', era:'modern', decade_min:2011, decade_max:2018, label:'Avicii 1', artist_lock:'Avicii' },
+  { query: 'Avicii karaoke',                     genre:'dance', era:'modern', decade_min:2011, decade_max:2018, label:'Avicii 2', artist_lock:'Avicii' },
+  { query: 'Avicii backing track instrumental',  genre:'dance', era:'modern', decade_min:2011, decade_max:2018, label:'Avicii 3', artist_lock:'Avicii' },
+  { query: '"Avicii" instrumental karaoke',      genre:'dance', era:'modern', decade_min:2011, decade_max:2018, label:'Avicii 4', artist_lock:'Avicii' },
+
+  // ══ SOUNDTRACKS ══════════════════════════════════════════════════════════
+  { query: 'Grease karaoke instrumental',             genre:'soundtracks', era:'60s70s', decade_min:1978, decade_max:1979, label:'Grease'           },
+  { query: 'Dirty Dancing karaoke instrumental',      genre:'soundtracks', era:'80s90s', decade_min:1987, decade_max:1988, label:'Dirty Dancing'    },
+  { query: 'Footloose karaoke instrumental',          genre:'soundtracks', era:'80s90s', decade_min:1984, decade_max:1985, label:'Footloose'        },
+  { query: 'Mamma Mia movie karaoke',                 genre:'soundtracks', era:'modern', decade_min:2008, decade_max:2019, label:'Mamma Mia'        },
+  { query: 'Greatest Showman karaoke instrumental',   genre:'soundtracks', era:'modern', decade_min:2017, decade_max:2018, label:'Greatest Showman' },
+  { query: 'La La Land karaoke instrumental',         genre:'soundtracks', era:'modern', decade_min:2016, decade_max:2017, label:'La La Land'       },
+  { query: 'Encanto karaoke instrumental',            genre:'soundtracks', era:'modern', decade_min:2021, decade_max:2022, label:'Encanto'          },
+  { query: 'Moana karaoke instrumental',              genre:'soundtracks', era:'modern', decade_min:2016, decade_max:2017, label:'Moana'            },
+  { query: 'Frozen karaoke instrumental',             genre:'soundtracks', era:'modern', decade_min:2013, decade_max:2020, label:'Frozen'           },
+  { query: 'Guardians Galaxy karaoke',                genre:'soundtracks', era:'modern', decade_min:2014, decade_max:2019, label:'Guardians'        },
+  { query: 'Disney karaoke instrumental',             genre:'soundtracks', era:'modern', decade_min:1989, decade_max:2029, label:'Disney Mix'       },
 ];
-
 // ─── Schema ───────────────────────────────────────────────────────────────────
 async function ensureSchema() {
   await pool.query(
