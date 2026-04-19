@@ -314,6 +314,325 @@ const KNOWN_YEARS = [
   ['I Wanna Dance with Somebody', 'Whitney Houston', 1987],
   ['Saving All My Love for You', 'Whitney Houston', 1985],
   ['Run to You', 'Whitney Houston', 1992],
+
+  // AC/DC
+  ['Highway to Hell', 'AC/DC', 1979], ['Back in Black', 'AC/DC', 1980],
+  ['Thunderstruck', 'AC/DC', 1990], ['You Shook Me All Night Long', 'AC/DC', 1980],
+  ['TNT', 'AC/DC', 1975], ['Rock and Roll Ain\'t Noise Pollution', 'AC/DC', 1980],
+
+  // Aerosmith
+  ['Dream On', 'Aerosmith', 1973], ['Sweet Emotion', 'Aerosmith', 1975],
+  ['Walk This Way', 'Aerosmith', 1975], ['I Don\'t Want to Miss a Thing', 'Aerosmith', 1998],
+  ['Livin\' on the Edge', 'Aerosmith', 1993], ['Cryin\'', 'Aerosmith', 1993],
+  ['Crazy', 'Aerosmith', 1994], ['Amazing', 'Aerosmith', 1993],
+
+  // Alicia Keys
+  ['Fallin\'', 'Alicia Keys', 2001], ['If I Ain\'t Got You', 'Alicia Keys', 2003],
+  ['No One', 'Alicia Keys', 2007], ['Girl on Fire', 'Alicia Keys', 2012],
+  ['Empire State of Mind', 'Alicia Keys', 2009], ['Superwoman', 'Alicia Keys', 2007],
+
+  // Amy Winehouse
+  ['Rehab', 'Amy Winehouse', 2006], ['Back to Black', 'Amy Winehouse', 2006],
+  ['Valerie', 'Amy Winehouse', 2006], ['Tears Dry on Their Own', 'Amy Winehouse', 2007],
+  ['You Know I\'m No Good', 'Amy Winehouse', 2006],
+
+  // Aretha Franklin
+  ['Respect', 'Aretha Franklin', 1967], ['Think', 'Aretha Franklin', 1968],
+  ['(You Make Me Feel Like) A Natural Woman', 'Aretha Franklin', 1967],
+  ['Chain of Fools', 'Aretha Franklin', 1967], ['I Say a Little Prayer', 'Aretha Franklin', 1968],
+  ['Something He Can Feel', 'Aretha Franklin', 1976], ['Rock Steady', 'Aretha Franklin', 1971],
+  ['Freeway of Love', 'Aretha Franklin', 1985], ['Who\'s Zoomin\' Who', 'Aretha Franklin', 1985],
+
+  // Avicii
+  ['Wake Me Up', 'Avicii', 2013], ['Hey Brother', 'Avicii', 2013],
+  ['Levels', 'Avicii', 2011], ['Waiting for Love', 'Avicii', 2015],
+  ['The Nights', 'Avicii', 2014], ['Without You', 'Avicii', 2013],
+
+  // Backstreet Boys
+  ['I Want It That Way', 'Backstreet Boys', 1999], ['Everybody', 'Backstreet Boys', 1997],
+  ['As Long as You Love Me', 'Backstreet Boys', 1997], ['Quit Playing Games', 'Backstreet Boys', 1996],
+  ['Show Me the Meaning of Being Lonely', 'Backstreet Boys', 1999],
+  ['Larger Than Life', 'Backstreet Boys', 1999],
+
+  // Beatles
+  ['Hey Jude', 'Beatles', 1968], ['Let It Be', 'Beatles', 1970],
+  ['Come Together', 'Beatles', 1969], ['Yesterday', 'Beatles', 1965],
+  ['A Hard Day\'s Night', 'Beatles', 1964], ['Help!', 'Beatles', 1965],
+  ['Twist and Shout', 'Beatles', 1963], ['Love Me Do', 'Beatles', 1962],
+  ['Eleanor Rigby', 'Beatles', 1966], ['Blackbird', 'Beatles', 1968],
+  ['In My Life', 'Beatles', 1965], ['Something', 'Beatles', 1969],
+  ['Here Comes the Sun', 'Beatles', 1969], ['Ob-La-Di Ob-La-Da', 'Beatles', 1968],
+
+  // Bon Jovi
+  ['Livin\' on a Prayer', 'Bon Jovi', 1986], ['You Give Love a Bad Name', 'Bon Jovi', 1986],
+  ['Wanted Dead or Alive', 'Bon Jovi', 1986], ['Bad Medicine', 'Bon Jovi', 1988],
+  ['Always', 'Bon Jovi', 1994], ['It\'s My Life', 'Bon Jovi', 2000],
+  ['Have a Nice Day', 'Bon Jovi', 2005],
+
+  // Britney Spears
+  ['Baby One More Time', 'Britney Spears', 1998], ['Toxic', 'Britney Spears', 2003],
+  ['Oops! I Did It Again', 'Britney Spears', 2000], ['Womanizer', 'Britney Spears', 2008],
+  ['Gimme More', 'Britney Spears', 2007], ['Lucky', 'Britney Spears', 2000],
+  ['Slave 4 U', 'Britney Spears', 2001],
+
+  // Bruce Springsteen
+  ['Born to Run', 'Bruce Springsteen', 1975], ['Born in the U.S.A.', 'Bruce Springsteen', 1984],
+  ['Dancing in the Dark', 'Bruce Springsteen', 1984], ['The River', 'Bruce Springsteen', 1980],
+  ['Thunder Road', 'Bruce Springsteen', 1975], ['Glory Days', 'Bruce Springsteen', 1984],
+
+  // Calvin Harris
+  ['Summer', 'Calvin Harris', 2014], ['Feel So Close', 'Calvin Harris', 2011],
+  ['We Found Love', 'Calvin Harris', 2011], ['This Is What You Came For', 'Calvin Harris', 2016],
+  ['One Kiss', 'Calvin Harris', 2018], ['Promises', 'Calvin Harris', 2018],
+  ['How Deep Is Your Love', 'Calvin Harris', 2015],
+
+  // Coolio
+  ['Gangsta\'s Paradise', 'Coolio', 1995], ['Fantastic Voyage', 'Coolio', 1994],
+  ['1 2 3 4 (Sumpin\' New)', 'Coolio', 1996], ['C U When U Get There', 'Coolio', 1997],
+
+  // Daft Punk
+  ['Get Lucky', 'Daft Punk', 2013], ['One More Time', 'Daft Punk', 2000],
+  ['Around the World', 'Daft Punk', 1997], ['Harder Better Faster Stronger', 'Daft Punk', 2001],
+  ['Da Funk', 'Daft Punk', 1995], ['Instant Crush', 'Daft Punk', 2013],
+  ['Lose Yourself to Dance', 'Daft Punk', 2013], ['Digital Love', 'Daft Punk', 2001],
+
+  // David Bowie
+  ['Heroes', 'David Bowie', 1977], ['Space Oddity', 'David Bowie', 1969],
+  ['Ziggy Stardust', 'David Bowie', 1972], ['Let\'s Dance', 'David Bowie', 1983],
+  ['Rebel Rebel', 'David Bowie', 1974], ['Golden Years', 'David Bowie', 1975],
+  ['Fame', 'David Bowie', 1975], ['Life on Mars?', 'David Bowie', 1971],
+  ['Changes', 'David Bowie', 1971], ['Under Pressure', 'David Bowie', 1981],
+
+  // David Guetta
+  ['Titanium', 'David Guetta', 2011], ['Without You', 'David Guetta', 2011],
+  ['She Wolf', 'David Guetta', 2009], ['Sexy Bitch', 'David Guetta', 2009],
+  ['Dangerous', 'David Guetta', 2014], ['Hey Mama', 'David Guetta', 2015],
+
+  // DMX
+  ['Party Up', 'DMX', 1999], ['X Gon\' Give It to Ya', 'DMX', 2003],
+  ['Ruff Ryders Anthem', 'DMX', 1998], ['Slippin\'', 'DMX', 1998],
+
+  // Dr. Dre
+  ['Still D.R.E.', 'Dr. Dre', 1999], ['The Next Episode', 'Dr. Dre', 1999],
+  ['Forgot About Dre', 'Dr. Dre', 1999], ['Nuthin\' But a G Thang', 'Dr. Dre', 1992],
+  ['Let Me Ride', 'Dr. Dre', 1992], ['Xxplosive', 'Dr. Dre', 1999],
+
+  // Eagles
+  ['Hotel California', 'Eagles', 1976], ['Take It Easy', 'Eagles', 1972],
+  ['Desperado', 'Eagles', 1973], ['Life in the Fast Lane', 'Eagles', 1977],
+  ['Lyin\' Eyes', 'Eagles', 1975], ['One of These Nights', 'Eagles', 1975],
+  ['Peaceful Easy Feeling', 'Eagles', 1972], ['Best of My Love', 'Eagles', 1974],
+
+  // Fleetwood Mac
+  ['Dreams', 'Fleetwood Mac', 1977], ['Go Your Own Way', 'Fleetwood Mac', 1977],
+  ['The Chain', 'Fleetwood Mac', 1977], ['Sara', 'Fleetwood Mac', 1979],
+  ['Say You Love Me', 'Fleetwood Mac', 1975], ['Gold Dust Woman', 'Fleetwood Mac', 1977],
+  ['Oh Well', 'Fleetwood Mac', 1969], ['Never Going Back Again', 'Fleetwood Mac', 1977],
+
+  // Foo Fighters
+  ['Everlong', 'Foo Fighters', 1997], ['Best of You', 'Foo Fighters', 2005],
+  ['The Pretender', 'Foo Fighters', 2007], ['Learn to Fly', 'Foo Fighters', 1999],
+  ['All My Life', 'Foo Fighters', 2002], ['Times Like These', 'Foo Fighters', 2002],
+  ['Monkey Wrench', 'Foo Fighters', 1997],
+
+  // Green Day
+  ['Basket Case', 'Green Day', 1994], ['Wake Me Up When September Ends', 'Green Day', 2005],
+  ['Boulevard of Broken Dreams', 'Green Day', 2004], ['Good Riddance', 'Green Day', 1997],
+  ['American Idiot', 'Green Day', 2004], ['Minority', 'Green Day', 2000],
+  ['Brain Stew', 'Green Day', 1996], ['Holiday', 'Green Day', 2004],
+
+  // James Brown
+  ['I Got You', 'James Brown', 1965], ['Sex Machine', 'James Brown', 1970],
+  ['Papa\'s Got a Brand New Bag', 'James Brown', 1965],
+  ['Please Please Please', 'James Brown', 1956], ['Super Bad', 'James Brown', 1970],
+  ['Living in America', 'James Brown', 1985],
+
+  // Jay-Z
+  ['Empire State of Mind', 'Jay-Z', 2009], ['99 Problems', 'Jay-Z', 2003],
+  ['Crazy in Love', 'Jay-Z', 2003], ['Run This Town', 'Jay-Z', 2009],
+  ['Izzo (H.O.V.A.)', 'Jay-Z', 2001], ['Hard Knock Life', 'Jay-Z', 1998],
+
+  // Jimi Hendrix
+  ['Purple Haze', 'Jimi Hendrix', 1967], ['All Along the Watchtower', 'Jimi Hendrix', 1968],
+  ['Hey Joe', 'Jimi Hendrix', 1966], ['Foxy Lady', 'Jimi Hendrix', 1967],
+  ['Little Wing', 'Jimi Hendrix', 1967], ['Voodoo Child', 'Jimi Hendrix', 1968],
+
+  // Justin Timberlake
+  ['Cry Me a River', 'Justin Timberlake', 2002], ['SexyBack', 'Justin Timberlake', 2006],
+  ['What Goes Around', 'Justin Timberlake', 2006], ['Mirrors', 'Justin Timberlake', 2013],
+  ['Can\'t Stop the Feeling!', 'Justin Timberlake', 2016],
+  ['Rock Your Body', 'Justin Timberlake', 2003], ['My Love', 'Justin Timberlake', 2006],
+
+  // Kanye West
+  ['Gold Digger', 'Kanye West', 2005], ['Stronger', 'Kanye West', 2007],
+  ['Heartless', 'Kanye West', 2008], ['Slow Jamz', 'Kanye West', 2003],
+  ['All Falls Down', 'Kanye West', 2004], ['Good Life', 'Kanye West', 2007],
+  ['Power', 'Kanye West', 2010],
+
+  // Kendrick Lamar
+  ['HUMBLE.', 'Kendrick Lamar', 2017], ['Swimming Pools', 'Kendrick Lamar', 2012],
+  ['Bitch Don\'t Kill My Vibe', 'Kendrick Lamar', 2012],
+  ['King Kunta', 'Kendrick Lamar', 2015], ['DNA.', 'Kendrick Lamar', 2017],
+  ['Alright', 'Kendrick Lamar', 2015], ['Money Trees', 'Kendrick Lamar', 2012],
+
+  // Kenny Rogers
+  ['The Gambler', 'Kenny Rogers', 1978], ['Islands in the Stream', 'Kenny Rogers', 1983],
+  ['Lucille', 'Kenny Rogers', 1977], ['Lady', 'Kenny Rogers', 1980],
+  ['Coward of the County', 'Kenny Rogers', 1979],
+
+  // Led Zeppelin
+  ['Stairway to Heaven', 'Led Zeppelin', 1971], ['Whole Lotta Love', 'Led Zeppelin', 1969],
+  ['Kashmir', 'Led Zeppelin', 1975], ['Black Dog', 'Led Zeppelin', 1971],
+  ['Rock and Roll', 'Led Zeppelin', 1971], ['Immigrant Song', 'Led Zeppelin', 1970],
+  ['Communication Breakdown', 'Led Zeppelin', 1969],
+
+  // Lil Nas X
+  ['Old Town Road', 'Lil Nas X', 2019], ['MONTERO', 'Lil Nas X', 2021],
+  ['Industry Baby', 'Lil Nas X', 2021], ['STAR WALKIN\'', 'Lil Nas X', 2022],
+  ['That\'s What I Want', 'Lil Nas X', 2021],
+
+  // Luke Bryan
+  ['Country Girl', 'Luke Bryan', 2011], ['That\'s My Kind of Night', 'Luke Bryan', 2013],
+  ['Play It Again', 'Luke Bryan', 2014], ['Drink a Beer', 'Luke Bryan', 2013],
+  ['Crash My Party', 'Luke Bryan', 2013], ['Light It Up', 'Luke Bryan', 2014],
+
+  // Madonna
+  ['Like a Prayer', 'Madonna', 1989], ['Material Girl', 'Madonna', 1984],
+  ['Like a Virgin', 'Madonna', 1984], ['Papa Don\'t Preach', 'Madonna', 1986],
+  ['Vogue', 'Madonna', 1990], ['Frozen', 'Madonna', 1998],
+  ['Ray of Light', 'Madonna', 1998], ['Hung Up', 'Madonna', 2005],
+  ['Holiday', 'Madonna', 1983], ['True Blue', 'Madonna', 1986],
+
+  // Marvin Gaye
+  ['Sexual Healing', 'Marvin Gaye', 1982], ['Let\'s Get It On', 'Marvin Gaye', 1973],
+  ['What\'s Going On', 'Marvin Gaye', 1971], ['Heard It Through the Grapevine', 'Marvin Gaye', 1968],
+  ['Mercy Mercy Me', 'Marvin Gaye', 1971], ['Got to Give It Up', 'Marvin Gaye', 1977],
+  ['I Heard It Through the Grapevine', 'Marvin Gaye', 1968],
+
+  // Missy Elliott
+  ['Work It', 'Missy Elliott', 2002], ['Get Ur Freak On', 'Missy Elliott', 2001],
+  ['Lose Control', 'Missy Elliott', 2005], ['Pass That Dutch', 'Missy Elliott', 2003],
+  ['Gossip Folks', 'Missy Elliott', 2002],
+
+  // Morgan Wallen
+  ['Wasted on You', 'Morgan Wallen', 2020], ['Sand in My Boots', 'Morgan Wallen', 2020],
+  ['More Than My Hometown', 'Morgan Wallen', 2020], ['Whiskey Glasses', 'Morgan Wallen', 2018],
+  ['7 Summers', 'Morgan Wallen', 2020], ['Thought You Should Know', 'Morgan Wallen', 2023],
+
+  // NSYNC
+  ['Bye Bye Bye', 'NSYNC', 2000], ['I Want You Back', 'NSYNC', 1996],
+  ['Tearing Up My Heart', 'NSYNC', 1997], ['It\'s Gonna Be Me', 'NSYNC', 2000],
+  ['God Must Have Spent', 'NSYNC', 1998], ['Tearin\' Up My Heart', 'NSYNC', 1997],
+
+  // Nas
+  ['N.Y. State of Mind', 'Nas', 1994], ['If I Ruled the World', 'Nas', 1996],
+  ['One Love', 'Nas', 1994], ['The World Is Yours', 'Nas', 1994],
+  ['Street Dreams', 'Nas', 1996], ['I Can', 'Nas', 2002],
+
+  // Nirvana
+  ['Smells Like Teen Spirit', 'Nirvana', 1991], ['Come as You Are', 'Nirvana', 1992],
+  ['Heart-Shaped Box', 'Nirvana', 1993], ['Lithium', 'Nirvana', 1991],
+  ['In Bloom', 'Nirvana', 1991], ['Rape Me', 'Nirvana', 1993],
+  ['About a Girl', 'Nirvana', 1989], ['The Man Who Sold the World', 'Nirvana', 1993],
+
+  // Notorious B.I.G.
+  ['Hypnotize', 'Notorious B.I.G', 1997], ['Big Poppa', 'Notorious B.I.G', 1994],
+  ['Juicy', 'Notorious B.I.G', 1994], ['Mo Money Mo Problems', 'Notorious B.I.G', 1997],
+  ['One More Chance', 'Notorious B.I.G', 1995],
+
+  // Oasis
+  ['Wonderwall', 'Oasis', 1995], ['Don\'t Look Back in Anger', 'Oasis', 1996],
+  ['Champagne Supernova', 'Oasis', 1995], ['Live Forever', 'Oasis', 1994],
+  ['Some Might Say', 'Oasis', 1995], ['Stand by Me', 'Oasis', 1997],
+  ['Half the World Away', 'Oasis', 1994],
+
+  // Otis Redding
+  ['(Sittin\' On) The Dock of the Bay', 'Otis Redding', 1967],
+  ['Try a Little Tenderness', 'Otis Redding', 1966],
+  ['Respect', 'Otis Redding', 1965], ['I\'ve Been Loving You Too Long', 'Otis Redding', 1965],
+
+  // Pearl Jam
+  ['Alive', 'Pearl Jam', 1991], ['Even Flow', 'Pearl Jam', 1992],
+  ['Jeremy', 'Pearl Jam', 1992], ['Black', 'Pearl Jam', 1991],
+  ['Better Man', 'Pearl Jam', 1994], ['Last Kiss', 'Pearl Jam', 1999],
+  ['Given to Fly', 'Pearl Jam', 1998],
+
+  // Pink Floyd
+  ['Another Brick in the Wall', 'Pink Floyd', 1979],
+  ['Wish You Were Here', 'Pink Floyd', 1975], ['Comfortably Numb', 'Pink Floyd', 1979],
+  ['Money', 'Pink Floyd', 1973], ['Time', 'Pink Floyd', 1973],
+  ['Shine On You Crazy Diamond', 'Pink Floyd', 1975],
+  ['Learning to Fly', 'Pink Floyd', 1987], ['Hey You', 'Pink Floyd', 1979],
+
+  // Post Malone
+  ['Rockstar', 'Post Malone', 2017], ['Sunflower', 'Post Malone', 2018],
+  ['Better Now', 'Post Malone', 2018], ['Circles', 'Post Malone', 2019],
+  ['Congratulations', 'Post Malone', 2016], ['White Iverson', 'Post Malone', 2015],
+  ['Psycho', 'Post Malone', 2018], ['I Fall Apart', 'Post Malone', 2016],
+
+  // Rolling Stones
+  ['Paint It Black', 'Rolling Stones', 1966], ['Sympathy for the Devil', 'Rolling Stones', 1968],
+  ['Gimme Shelter', 'Rolling Stones', 1969], ['Start Me Up', 'Rolling Stones', 1981],
+  ['(I Can\'t Get No) Satisfaction', 'Rolling Stones', 1965],
+  ['Jumpin\' Jack Flash', 'Rolling Stones', 1968], ['Angie', 'Rolling Stones', 1973],
+  ['Wild Horses', 'Rolling Stones', 1971], ['Miss You', 'Rolling Stones', 1978],
+
+  // SZA
+  ['Good Days', 'SZA', 2020], ['Kill Bill', 'SZA', 2022],
+  ['Shirt', 'SZA', 2022], ['Snooze', 'SZA', 2022],
+  ['Love Galore', 'SZA', 2017], ['The Weekend', 'SZA', 2017],
+  ['Drew Barrymore', 'SZA', 2017], ['Broken Clocks', 'SZA', 2017],
+
+  // Snoop Dogg
+  ['Gin and Juice', 'Snoop Dogg', 1994], ['Drop It Like It\'s Hot', 'Snoop Dogg', 2004],
+  ['Beautiful', 'Snoop Dogg', 2003], ['Signs', 'Snoop Dogg', 2005],
+  ['Doggy Dogg World', 'Snoop Dogg', 1993], ['Who Am I?', 'Snoop Dogg', 1993],
+
+  // Spice Girls
+  ['Wannabe', 'Spice Girls', 1996], ['Say You\'ll Be There', 'Spice Girls', 1996],
+  ['2 Become 1', 'Spice Girls', 1996], ['Mama', 'Spice Girls', 1997],
+  ['Who Do You Think You Are', 'Spice Girls', 1997], ['Stop', 'Spice Girls', 1997],
+  ['Too Much', 'Spice Girls', 1997],
+
+  // Stevie Wonder
+  ['Superstition', 'Stevie Wonder', 1972], ['I Just Called to Say I Love You', 'Stevie Wonder', 1984],
+  ['Sir Duke', 'Stevie Wonder', 1977], ['Happy Birthday', 'Stevie Wonder', 1980],
+  ['Isn\'t She Lovely', 'Stevie Wonder', 1976], ['Higher Ground', 'Stevie Wonder', 1973],
+  ['Signed Sealed Delivered', 'Stevie Wonder', 1970], ['Master Blaster', 'Stevie Wonder', 1980],
+
+  // TLC
+  ['Waterfalls', 'TLC', 1995], ['No Scrubs', 'TLC', 1999],
+  ['Creep', 'TLC', 1994], ['Crazy Sexy Cool', 'TLC', 1994],
+  ['Red Light Special', 'TLC', 1994], ['Unpretty', 'TLC', 1999],
+
+  // 2Pac
+  ['California Love', '2Pac', 1995], ['Dear Mama', '2Pac', 1995],
+  ['All Eyez on Me', '2Pac', 1996], ['Changes', '2Pac', 1998],
+  ['Gangsta Paradise', '2Pac', 1995], ['Hit \'Em Up', '2Pac', 1996],
+  ['How Do U Want It', '2Pac', 1996], ['Keep Ya Head Up', '2Pac', 1993],
+
+  // U2
+  ['With or Without You', 'U2', 1987], ['One', 'U2', 1992],
+  ['Sunday Bloody Sunday', 'U2', 1983], ['Where the Streets Have No Name', 'U2', 1987],
+  ['I Still Haven\'t Found What I\'m Looking For', 'U2', 1987],
+  ['Beautiful Day', 'U2', 2000], ['Mysterious Ways', 'U2', 1991],
+  ['Elevation', 'U2', 2001], ['Vertigo', 'U2', 2004],
+
+  // Usher
+  ['Yeah!', 'Usher', 2004], ['Confessions Part II', 'Usher', 2004],
+  ['My Boo', 'Usher', 2004], ['Burn', 'Usher', 2004],
+  ['Love in This Club', 'Usher', 2008], ['OMG', 'Usher', 2010],
+  ['DJ Got Us Fallin\' in Love', 'Usher', 2010], ['U Got It Bad', 'Usher', 2001],
+
+  // Van Halen
+  ['Jump', 'Van Halen', 1984], ['Panama', 'Van Halen', 1984],
+  ['Hot for Teacher', 'Van Halen', 1984], ['Runnin\' with the Devil', 'Van Halen', 1978],
+  ['Eruption', 'Van Halen', 1978], ['Why Can\'t This Be Love', 'Van Halen', 1986],
+
+  // Warren G
+  ['Regulate', 'Warren G', 1994], ['This DJ', 'Warren G', 1994],
+  ['What\'s Next', 'Warren G', 1994], ['I Want It All', 'Warren G', 1999],
+
 ];
 
 // Build lookup map: normalised "title||artist" → year

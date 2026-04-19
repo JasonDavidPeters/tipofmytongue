@@ -19,12 +19,14 @@ const express = require('express');
 const path    = require('path');
 const pool    = require('./db');
 const { ingestFromDeezer, ensureSchema } = require('./catalog');
+const { registerAuthRoutes, ensureUserSchema, requireDev } = require('./auth');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+registerAuthRoutes(app); // Auth routes + cookie/JWT middleware
 
 // ─── Instrumental keyword check (same list as catalog.js) ────────────────────
 const INSTR_KW = [
@@ -247,7 +249,9 @@ app.get('/api/artists', async (_req, res) => {
 // ─── GET /api/admin/ingest ────────────────────────────────────────────────────
 app.get('/api/admin/ingest', async (req, res) => {
   const secret = process.env.ADMIN_SECRET;
-  if (!TESTING && secret && req.query.secret !== secret) {
+  // Allow: TESTING mode, valid ADMIN_SECRET, or developer/admin role
+  const hasDev = req.user && (req.user.role === 'developer' || req.user.role === 'admin');
+  if (!TESTING && !hasDev && secret && req.query.secret !== secret) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   res.json({ message: 'Ingest started', force: req.query.force === 'true' });
@@ -257,8 +261,9 @@ app.get('/api/admin/ingest', async (req, res) => {
 // ─── GET /api/admin/reset ─────────────────────────────────────────────────────
 // Testing-mode only. Truncates the songs table then re-runs the full ingest.
 // Returns 403 in production.
-app.get('/api/admin/reset', async (_req, res) => {
-  if (!TESTING) return res.status(403).json({ error: 'Not in testing mode' });
+app.get('/api/admin/reset', async (req, res) => {
+  const hasDev = req.user && (req.user.role === 'developer' || req.user.role === 'admin');
+  if (!TESTING && !hasDev) return res.status(403).json({ error: 'Not in testing mode' });
   try {
     await pool.query('TRUNCATE TABLE songs RESTART IDENTITY');
     console.log('[TESTING] Songs table cleared');
@@ -279,6 +284,7 @@ app.get('*', (_req, res) => {
 async function start() {
   try {
     await ensureSchema();
+    await ensureUserSchema();
     console.log('DB schema ready');
   } catch (err) {
     console.error('Fatal — schema error:', err.message);
