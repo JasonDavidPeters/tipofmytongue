@@ -191,7 +191,90 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// ─── GET /api/admin/fix-years ─────────────────────────────────────────────────
+// ─── GET /api/admin/clean ─────────────────────────────────────────────────────
+// Removes songs from the DB that are clearly wrong:
+//   1. Songs stored under a locked artist but whose year falls outside that
+//      artist's known decade window (e.g. Balada para Adelina under Adele)
+//   2. Songs with decade=null stored under a locked artist (unverifiable)
+// Safe to run at any time — only deletes, does not modify other songs.
+// Call: GET /api/admin/clean?secret=X  (add &dry_run=true to preview)
+app.get('/api/admin/clean', async (req, res) => {
+  const secret = process.env.ADMIN_SECRET;
+  const hasDev = req.user && (req.user.role === 'developer' || req.user.role === 'admin');
+  if (!TESTING && !hasDev && secret && req.query.secret !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const dryRun = req.query.dry_run === 'true';
+
+  // Artist decade windows — must match catalog.js source definitions
+  const ARTIST_WINDOWS = {
+    'adele':            { min: 2008, max: 2029 },
+    'taylor swift':     { min: 2006, max: 2029 },
+    'ed sheeran':       { min: 2011, max: 2029 },
+    'billie eilish':    { min: 2016, max: 2029 },
+    'dua lipa':         { min: 2015, max: 2029 },
+    'ariana grande':    { min: 2013, max: 2029 },
+    'olivia rodrigo':   { min: 2021, max: 2029 },
+    'harry styles':     { min: 2017, max: 2029 },
+    'justin bieber':    { min: 2009, max: 2029 },
+    'bruno mars':       { min: 2010, max: 2029 },
+    'the weeknd':       { min: 2012, max: 2029 },
+    'sza':              { min: 2017, max: 2029 },
+    'lady gaga':        { min: 2008, max: 2016 },
+    'beyonce':          { min: 2003, max: 2029 },
+    'rihanna':          { min: 2005, max: 2016 },
+    'drake':            { min: 2009, max: 2029 },
+    'kendrick lamar':   { min: 2011, max: 2029 },
+    'post malone':      { min: 2016, max: 2029 },
+    'shania twain':     { min: 1993, max: 2003 },
+    'dolly parton':     { min: 1967, max: 1990 },
+    'johnny cash':      { min: 1955, max: 1985 },
+    'garth brooks':     { min: 1989, max: 2001 },
+    'morgan wallen':    { min: 2018, max: 2029 },
+    'luke bryan':       { min: 2007, max: 2029 },
+    'nirvana':          { min: 1989, max: 1999 },
+    'queen':            { min: 1973, max: 1991 },
+    'beatles':          { min: 1963, max: 1970 },
+    'eminem':           { min: 1999, max: 2020 },
+    'coldplay':         { min: 2000, max: 2022 },
+    'abba':             { min: 1972, max: 1982 },
+    'elton john':       { min: 1970, max: 1990 },
+    'whitney houston':  { min: 1985, max: 2009 },
+    'mariah carey':     { min: 1990, max: 2005 },
+  };
+
+  try {
+    const { rows: allSongs } = await pool.query(
+      `SELECT id, title, artist, decade FROM songs WHERE enabled = true ORDER BY artist, title`
+    );
+
+    const toDelete = [];
+    for (const song of allSongs) {
+      const artistKey = song.artist.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+      const window = ARTIST_WINDOWS[artistKey];
+      if (!window) continue; // not a locked artist, skip
+
+      if (song.decade === null) {
+        toDelete.push({ ...song, reason: 'null decade on locked artist' });
+      } else if (song.decade < window.min || song.decade > window.max) {
+        toDelete.push({ ...song, reason: `decade ${song.decade} outside ${window.min}-${window.max}` });
+      }
+    }
+
+    if (!dryRun && toDelete.length > 0) {
+      const ids = toDelete.map(s => s.id);
+      await pool.query(`DELETE FROM songs WHERE id = ANY($1)`, [ids]);
+    }
+
+    res.json({
+      dry_run: dryRun,
+      removed: toDelete.length,
+      songs: toDelete.map(s => ({ id: s.id, title: s.title, artist: s.artist, decade: s.decade, reason: s.reason })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // Backfills decade=null rows using the Deezer cross-reference year lookup.
 // Runs in the background — responds immediately with "started".
 // Call: GET /api/admin/fix-years?secret=X

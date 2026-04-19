@@ -891,12 +891,17 @@ async function insertTracks(tracks, source) {
     }
 
     // 5. Validate year against source's decade window
-    //    Known-year and MB-found years are validated strictly.
-    //    If year is completely unknown (null) — insert with null decade, no penalty.
+    //    For artist_lock sources: if year is unknown we REJECT the track.
+    //    We cannot verify it belongs to this artist, so we don't trust it.
+    //    (This prevents "Balada para Adelina" from appearing in Adele's playlist.)
+    //    For non-locked genre sources: null year is acceptable — insert with decade=null.
     if (originalYear !== null) {
       if (originalYear < source.decade_min || originalYear > source.decade_max) {
         rejected++; continue;
       }
+    } else if (source.artist_lock) {
+      // Couldn't verify year for a locked-artist track — too risky, reject
+      rejected++; continue;
     }
 
     const era          = source.era;
