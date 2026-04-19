@@ -163,16 +163,44 @@ const SOURCES = [
   { query: 'Karaoke Hits pop 2000s',          genre:'pop',         era:'2000s',   decade_min:2000, decade_max:2009, label:'Pop 2000s'           },
   { query: 'Karaoke Hits pop 90s',            genre:'pop',         era:'80s90s',  decade_min:1990, decade_max:1999, label:'Pop 90s'             },
   { query: 'Karaoke Hits pop 80s',            genre:'pop',         era:'80s90s',  decade_min:1980, decade_max:1989, label:'Pop 80s'             },
-  { query: 'Taylor Swift karaoke instrumental', genre:'pop',       era:'modern',  decade_min:2006, decade_max:2029, label:'Taylor Swift',        artist_lock:'Taylor Swift'    },
-  { query: 'Adele karaoke instrumental',      genre:'pop',         era:'modern',  decade_min:2008, decade_max:2029, label:'Adele',               artist_lock:'Adele'           },
-  { query: 'Ed Sheeran karaoke',              genre:'pop',         era:'modern',  decade_min:2011, decade_max:2029, label:'Ed Sheeran',          artist_lock:'Ed Sheeran'      },
-  { query: 'Bruno Mars karaoke',              genre:'pop',         era:'modern',  decade_min:2010, decade_max:2029, label:'Bruno Mars',          artist_lock:'Bruno Mars'      },
-  { query: 'Billie Eilish karaoke',           genre:'pop',         era:'modern',  decade_min:2017, decade_max:2029, label:'Billie Eilish',       artist_lock:'Billie Eilish'   },
-  { query: 'Olivia Rodrigo karaoke',          genre:'pop',         era:'modern',  decade_min:2021, decade_max:2029, label:'Olivia Rodrigo',      artist_lock:'Olivia Rodrigo'  },
-  { query: 'Dua Lipa karaoke instrumental',   genre:'pop',         era:'modern',  decade_min:2017, decade_max:2029, label:'Dua Lipa',            artist_lock:'Dua Lipa'        },
-  { query: 'Harry Styles karaoke',            genre:'pop',         era:'modern',  decade_min:2017, decade_max:2029, label:'Harry Styles',        artist_lock:'Harry Styles'    },
-  { query: 'Ariana Grande karaoke',           genre:'pop',         era:'modern',  decade_min:2013, decade_max:2029, label:'Ariana Grande',       artist_lock:'Ariana Grande'   },
-  { query: 'Justin Bieber karaoke',           genre:'pop',         era:'modern',  decade_min:2010, decade_max:2029, label:'Justin Bieber',       artist_lock:'Justin Bieber'   },
+  { query: 'Taylor Swift karaoke instrumental', genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 1', artist_lock:'Taylor Swift' },
+  { query: 'Taylor Swift karaoke',              genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 2', artist_lock:'Taylor Swift' },
+  { query: 'Taylor Swift backing track',        genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 3', artist_lock:'Taylor Swift' },
+  { query: '"Taylor Swift" instrumental',       genre:'pop', era:'modern', decade_min:2006, decade_max:2029, label:'Taylor Swift 4', artist_lock:'Taylor Swift' },
+
+  { query: 'Adele karaoke instrumental',        genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 1',         artist_lock:'Adele' },
+  { query: 'Adele karaoke',                     genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 2',         artist_lock:'Adele' },
+  { query: 'Adele backing track instrumental',  genre:'pop', era:'modern', decade_min:2008, decade_max:2029, label:'Adele 3',         artist_lock:'Adele' },
+
+  { query: 'Ed Sheeran karaoke instrumental',   genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 1',    artist_lock:'Ed Sheeran' },
+  { query: 'Ed Sheeran karaoke',                genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 2',    artist_lock:'Ed Sheeran' },
+  { query: 'Ed Sheeran backing track',          genre:'pop', era:'modern', decade_min:2011, decade_max:2029, label:'Ed Sheeran 3',    artist_lock:'Ed Sheeran' },
+
+  { query: 'Bruno Mars karaoke instrumental',   genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 1',    artist_lock:'Bruno Mars' },
+  { query: 'Bruno Mars karaoke',                genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 2',    artist_lock:'Bruno Mars' },
+  { query: 'Bruno Mars backing track',          genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Bruno Mars 3',    artist_lock:'Bruno Mars' },
+
+  { query: 'Billie Eilish karaoke instrumental',genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 1', artist_lock:'Billie Eilish' },
+  { query: 'Billie Eilish karaoke',             genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 2', artist_lock:'Billie Eilish' },
+  { query: 'Billie Eilish backing track',       genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Billie Eilish 3', artist_lock:'Billie Eilish' },
+
+  { query: 'Olivia Rodrigo karaoke',            genre:'pop', era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 1',artist_lock:'Olivia Rodrigo' },
+  { query: 'Olivia Rodrigo karaoke instrumental',genre:'pop',era:'modern', decade_min:2021, decade_max:2029, label:'Olivia Rodrigo 2',artist_lock:'Olivia Rodrigo' },
+
+  { query: 'Dua Lipa karaoke instrumental',     genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Dua Lipa 1',      artist_lock:'Dua Lipa' },
+  { query: 'Dua Lipa karaoke',                  genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Dua Lipa 2',      artist_lock:'Dua Lipa' },
+  { query: 'Dua Lipa backing track',            genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Dua Lipa 3',      artist_lock:'Dua Lipa' },
+
+  { query: 'Harry Styles karaoke instrumental', genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 1',  artist_lock:'Harry Styles' },
+  { query: 'Harry Styles karaoke',              genre:'pop', era:'modern', decade_min:2017, decade_max:2029, label:'Harry Styles 2',  artist_lock:'Harry Styles' },
+
+  { query: 'Ariana Grande karaoke instrumental',genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 1', artist_lock:'Ariana Grande' },
+  { query: 'Ariana Grande karaoke',             genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 2', artist_lock:'Ariana Grande' },
+  { query: 'Ariana Grande backing track',       genre:'pop', era:'modern', decade_min:2013, decade_max:2029, label:'Ariana Grande 3', artist_lock:'Ariana Grande' },
+
+  { query: 'Justin Bieber karaoke instrumental',genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Justin Bieber 1', artist_lock:'Justin Bieber' },
+  { query: 'Justin Bieber karaoke',             genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Justin Bieber 2', artist_lock:'Justin Bieber' },
+  { query: 'Justin Bieber backing track',       genre:'pop', era:'modern', decade_min:2010, decade_max:2029, label:'Justin Bieber 3', artist_lock:'Justin Bieber' },
   { query: 'Lady Gaga karaoke instrumental',  genre:'pop',         era:'2000s',   decade_min:2008, decade_max:2015, label:'Lady Gaga',           artist_lock:'Lady Gaga'       },
   { query: 'Beyonce karaoke instrumental',    genre:'pop',         era:'2000s',   decade_min:2003, decade_max:2016, label:'Beyonce Pop',         artist_lock:'Beyonce'         },
   { query: 'Rihanna karaoke instrumental',    genre:'pop',         era:'2000s',   decade_min:2005, decade_max:2016, label:'Rihanna',             artist_lock:'Rihanna'         },
@@ -204,8 +232,14 @@ const SOURCES = [
   // ════════════════════════════════════════════════════════════════════════════
   // CLASSIC ROCK (60s / 70s)
   // ════════════════════════════════════════════════════════════════════════════
-  { query: 'Queen karaoke instrumental',      genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen',              artist_lock:'Queen'           },
-  { query: 'Beatles karaoke instrumental',    genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles',            artist_lock:'Beatles'         },
+  { query: 'Queen karaoke instrumental',           genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 1',   artist_lock:'Queen' },
+  { query: 'Queen karaoke',                        genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 2',   artist_lock:'Queen' },
+  { query: 'Queen backing track',                  genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 3',   artist_lock:'Queen' },
+  { query: '"Queen" instrumental rock',            genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen 4',   artist_lock:'Queen' },
+
+  { query: 'Beatles karaoke instrumental',         genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 1', artist_lock:'Beatles' },
+  { query: 'Beatles karaoke',                      genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 2', artist_lock:'Beatles' },
+  { query: 'Beatles backing track',                genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles 3', artist_lock:'Beatles' },
   { query: 'Led Zeppelin karaoke instrumental',genre:'classic-rock',era:'60s70s', decade_min:1968, decade_max:1982, label:'Led Zeppelin',       artist_lock:'Led Zeppelin'    },
   { query: 'Rolling Stones karaoke',         genre:'classic-rock', era:'60s70s',  decade_min:1963, decade_max:1982, label:'Rolling Stones',     artist_lock:'Rolling Stones'  },
   { query: 'Fleetwood Mac karaoke',          genre:'classic-rock', era:'60s70s',  decade_min:1968, decade_max:1990, label:'Fleetwood Mac',      artist_lock:'Fleetwood Mac'   },
@@ -266,15 +300,37 @@ const SOURCES = [
   // ════════════════════════════════════════════════════════════════════════════
   // COUNTRY
   // ════════════════════════════════════════════════════════════════════════════
-  { query: 'Shania Twain karaoke instrumental',genre:'country',    era:'80s90s',  decade_min:1993, decade_max:2003, label:'Shania Twain',        artist_lock:'Shania Twain'    },
-  { query: 'Dolly Parton karaoke instrumental',genre:'country',    era:'60s70s',  decade_min:1967, decade_max:1990, label:'Dolly Parton',        artist_lock:'Dolly Parton'    },
-  { query: 'Johnny Cash karaoke instrumental', genre:'country',    era:'60s70s',  decade_min:1955, decade_max:1985, label:'Johnny Cash',         artist_lock:'Johnny Cash'     },
-  { query: 'Garth Brooks karaoke instrumental',genre:'country',    era:'80s90s',  decade_min:1989, decade_max:2001, label:'Garth Brooks',        artist_lock:'Garth Brooks'    },
-  { query: 'Kenny Rogers karaoke',            genre:'country',     era:'60s70s',  decade_min:1976, decade_max:1992, label:'Kenny Rogers',        artist_lock:'Kenny Rogers'    },
-  { query: 'Luke Bryan karaoke instrumental', genre:'country',     era:'modern',  decade_min:2007, decade_max:2029, label:'Luke Bryan',          artist_lock:'Luke Bryan'      },
-  { query: 'Morgan Wallen karaoke',           genre:'country',     era:'modern',  decade_min:2018, decade_max:2029, label:'Morgan Wallen',       artist_lock:'Morgan Wallen'   },
-  { query: 'Karaoke Hits country 80s 90s',    genre:'country',     era:'80s90s',  decade_min:1980, decade_max:1999, label:'Country 80s-90s'                                    },
-  { query: 'Karaoke Hits country 2000s',      genre:'country',     era:'2000s',   decade_min:2000, decade_max:2009, label:'Country 2000s'                                       },
+  // Shania Twain — multiple queries to maximise song pool
+  { query: 'Shania Twain karaoke instrumental',      genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania Twain 1', artist_lock:'Shania Twain' },
+  { query: 'Shania Twain karaoke',                   genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania Twain 2', artist_lock:'Shania Twain' },
+  { query: 'Shania Twain backing track',             genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania Twain 3', artist_lock:'Shania Twain' },
+  { query: '"Shania Twain" instrumental',            genre:'country', era:'80s90s', decade_min:1993, decade_max:2003, label:'Shania Twain 4', artist_lock:'Shania Twain' },
+
+  // Dolly Parton — multiple queries
+  { query: 'Dolly Parton karaoke instrumental',      genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly Parton 1', artist_lock:'Dolly Parton' },
+  { query: 'Dolly Parton karaoke',                   genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly Parton 2', artist_lock:'Dolly Parton' },
+  { query: 'Dolly Parton backing track',             genre:'country', era:'60s70s', decade_min:1967, decade_max:1990, label:'Dolly Parton 3', artist_lock:'Dolly Parton' },
+
+  // Johnny Cash
+  { query: 'Johnny Cash karaoke instrumental',       genre:'country', era:'60s70s', decade_min:1955, decade_max:1985, label:'Johnny Cash 1',  artist_lock:'Johnny Cash' },
+  { query: 'Johnny Cash karaoke',                    genre:'country', era:'60s70s', decade_min:1955, decade_max:1985, label:'Johnny Cash 2',  artist_lock:'Johnny Cash' },
+  { query: 'Johnny Cash backing track',              genre:'country', era:'60s70s', decade_min:1955, decade_max:1985, label:'Johnny Cash 3',  artist_lock:'Johnny Cash' },
+
+  // Garth Brooks
+  { query: 'Garth Brooks karaoke instrumental',      genre:'country', era:'80s90s', decade_min:1989, decade_max:2001, label:'Garth Brooks 1', artist_lock:'Garth Brooks' },
+  { query: 'Garth Brooks karaoke',                   genre:'country', era:'80s90s', decade_min:1989, decade_max:2001, label:'Garth Brooks 2', artist_lock:'Garth Brooks' },
+
+  { query: 'Kenny Rogers karaoke',                   genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny Rogers 1', artist_lock:'Kenny Rogers' },
+  { query: 'Kenny Rogers backing track instrumental',genre:'country', era:'60s70s', decade_min:1976, decade_max:1992, label:'Kenny Rogers 2', artist_lock:'Kenny Rogers' },
+
+  { query: 'Luke Bryan karaoke instrumental',        genre:'country', era:'modern',  decade_min:2007, decade_max:2029, label:'Luke Bryan 1',   artist_lock:'Luke Bryan' },
+  { query: 'Luke Bryan karaoke',                     genre:'country', era:'modern',  decade_min:2007, decade_max:2029, label:'Luke Bryan 2',   artist_lock:'Luke Bryan' },
+
+  { query: 'Morgan Wallen karaoke',                  genre:'country', era:'modern',  decade_min:2018, decade_max:2029, label:'Morgan Wallen 1',artist_lock:'Morgan Wallen' },
+  { query: 'Morgan Wallen instrumental',             genre:'country', era:'modern',  decade_min:2018, decade_max:2029, label:'Morgan Wallen 2',artist_lock:'Morgan Wallen' },
+
+  { query: 'Karaoke Hits country 80s 90s',           genre:'country', era:'80s90s',  decade_min:1980, decade_max:1999, label:'Country 80s-90s' },
+  { query: 'Karaoke Hits country 2000s',             genre:'country', era:'2000s',   decade_min:2000, decade_max:2009, label:'Country 2000s'   },
 
   // ════════════════════════════════════════════════════════════════════════════
   // DANCE / ELECTRONIC
@@ -347,13 +403,22 @@ async function insertTracks(tracks, source) {
       continue;
     }
 
-    // ── 3. artist_lock — if source specifies a required artist, enforce it ─
+    // ── 3. artist_lock — strict enforcement ──────────────────────────────────
     if (source.artist_lock) {
       const lockNorm   = normArtist(source.artist_lock);
       const artistNorm = normArtist(realArtist);
-      // Accept if the extracted artist contains the locked artist name
-      // (handles slight variations like "Billie Eilish" vs "Billie Eilish & Khalid")
-      if (!artistNorm.includes(lockNorm) && !lockNorm.includes(artistNorm)) {
+
+      // Strategy: the extracted artist must START WITH or exactly equal the
+      // locked artist name. We allow "Shania Twain & Friends" to match
+      // "Shania Twain", but NOT "Coldplay" to match "Shania Twain".
+      // We do NOT allow lockNorm.includes(artistNorm) because that would
+      // let "Taylor" match "Taylor Swift".
+      const exactMatch  = artistNorm === lockNorm;
+      const startsMatch = artistNorm.startsWith(lockNorm + ' ') ||
+                          artistNorm.startsWith(lockNorm + '&') ||
+                          artistNorm.startsWith(lockNorm + ',');
+
+      if (!exactMatch && !startsMatch) {
         rejected++;
         continue;
       }

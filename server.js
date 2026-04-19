@@ -53,24 +53,38 @@ app.get('/api/songs', async (req, res) => {
     const params     = [];
 
     if (artist !== 'all') {
-      // Artist mode: filter by artist name (case-insensitive contains)
-      params.push('%' + artist.toLowerCase() + '%');
-      conditions.push(`lower(artist) LIKE $${params.length}`);
+      // Artist mode: exact match on the artist column (no LIKE wildcards).
+      // The DB artist column holds the real artist name stored at ingest time.
+      // We compare normalised (lower, strip punctuation) to handle minor variations.
+      params.push(artist.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim());
+      conditions.push(
+        `regexp_replace(lower(artist), '[^a-z0-9 ]', ' ', 'g') = $${params.length}`
+      );
     } else {
       if (era   !== 'all') { params.push(era);   conditions.push(`era = $${params.length}`); }
       if (genre !== 'all') { params.push(genre);  conditions.push(`genre = $${params.length}`); }
     }
 
-    params.push(count);
-    const where = conditions.join(' AND ');
+    // Count total available before applying LIMIT — frontend uses this to
+    // cap the number of rounds when the artist catalog is smaller than requested.
+    const countWhere = conditions.join(' AND ');
+    const countParams = [...params];
+    const totalAvailable = await pool.query(
+      `SELECT COUNT(*) AS n FROM songs WHERE ${countWhere}`,
+      countParams
+    );
+    const available = parseInt(totalAvailable.rows[0].n);
+
+    params.push(Math.min(count, available || count));
+    const where = countWhere;
     const sql   = `SELECT id, title, artist, era, genre, decade, deezer_query
                    FROM songs WHERE ${where}
                    ORDER BY RANDOM() LIMIT $${params.length}`;
 
     let result = await pool.query(sql, params);
 
-    // Fallback: if filtered query returns nothing, pull from full catalog
-    if (result.rows.length === 0) {
+    // Only fall back to full catalog for genre/era mode, never for artist mode
+    if (result.rows.length === 0 && artist === 'all') {
       result = await pool.query(
         `SELECT id, title, artist, era, genre, decade, deezer_query
          FROM songs WHERE enabled = true
@@ -79,7 +93,7 @@ app.get('/api/songs', async (req, res) => {
       );
     }
 
-    res.json({ songs: result.rows });
+    res.json({ songs: result.rows, totalAvailable: available });
   } catch (err) {
     console.error('[/api/songs]', err.message);
     res.status(500).json({ error: 'Database error' });
@@ -107,12 +121,15 @@ app.get('/api/preview', async (req, res) => {
     return res.status(500).json({ error: 'Database error' });
   }
 
-  // Fresh Deezer search — try progressively broader queries
+  // Fresh Deezer search — try progressively broader queries.
+  // We search for the instrumental/karaoke version of the specific song.
+  // The artist name from deezer_query is the real artist (not the publisher).
   const queries = [
-    song.deezer_query,                                              // most specific
+    song.deezer_query,                                                        // e.g. '"Magic" "Coldplay" instrumental karaoke'
     `"${song.title}" "${song.artist}" karaoke`,
-    `"${song.title}" karaoke instrumental`,
-    `${song.title} ${song.artist} karaoke`,                        // broadest fallback
+    `"${song.title}" "${song.artist}" instrumental`,
+    `"${song.title}" karaoke instrumental`,                                   // drop artist — wider net
+    `${song.title} karaoke`,                                                  // broadest — title only
   ];
 
   let previewUrl = null;
@@ -120,9 +137,9 @@ app.get('/api/preview', async (req, res) => {
   for (const q of queries) {
     if (previewUrl) break;
     try {
-      const r    = await fetch(
-        `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=25`,
-        { signal: AbortSignal.timeout(8000) }
+      const r = await fetch(
+        `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=50`,
+        { signal: AbortSignal.timeout(10000) }
       );
       if (!r.ok) continue;
       const data = await r.json();
@@ -135,6 +152,12 @@ app.get('/api/preview', async (req, res) => {
     } catch (e) {
       console.warn('[/api/preview] Deezer search failed:', e.message);
     }
+  }
+
+  // If still nothing, mark this song as having no preview so the game
+  // can skip it cleanly. We log it so we can identify problem songs.
+  if (!previewUrl) {
+    console.warn(`[/api/preview] No instrumental preview found for: ${song.title} — ${song.artist}`);
   }
 
   res.json({ previewUrl: previewUrl ?? null });
