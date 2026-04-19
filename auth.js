@@ -14,9 +14,15 @@
  * Developer role gives access to /api/admin/* endpoints without ADMIN_SECRET.
  */
 
-const bcrypt = require('bcrypt');
-const jwt    = require('jsonwebtoken');
-const pool   = require('./db');
+let bcrypt, jwt;
+try {
+  bcrypt = require('bcrypt');
+  jwt    = require('jsonwebtoken');
+} catch(e) {
+  console.error('Auth dependencies missing — run: npm install');
+  console.error('Auth will be disabled until dependencies are installed.');
+}
+const pool = require('./db');
 
 const JWT_SECRET  = process.env.JWT_SECRET || 'toyt-dev-secret-change-in-production';
 const JWT_EXPIRES = '30d';
@@ -61,6 +67,7 @@ async function ensureUserSchema() {
 
 // ─── JWT helpers ──────────────────────────────────────────────────────────────
 function signToken(user) {
+  if (!jwt) throw new Error('jsonwebtoken not installed');
   return jwt.sign(
     { id: user.id, username: user.username, role: user.role },
     JWT_SECRET,
@@ -89,7 +96,7 @@ function authenticate(req, res, next) {
     return next();
   }
   try {
-    req.user = jwt.verify(token, JWT_SECRET);
+    req.user = jwt ? jwt.verify(token, JWT_SECRET) : null;
   } catch {
     req.user = null;
   }
@@ -140,6 +147,7 @@ async function register(req, res) {
   const avatarId = AVATARS.find(a => a.id === avatar) ? avatar : 'vinyl';
 
   try {
+    if (!bcrypt) return res.status(503).json({ error: 'Auth service not configured — run npm install on server' });
     const hash = await bcrypt.hash(password, SALT_ROUNDS);
     const { rows } = await pool.query(
       `INSERT INTO users (username, email, password_hash, avatar)
@@ -176,6 +184,7 @@ async function login(req, res) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     const user  = rows[0];
+    if (!bcrypt) return res.status(503).json({ error: 'Auth service not configured' });
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(401).json({ error: 'Invalid email or password' });
