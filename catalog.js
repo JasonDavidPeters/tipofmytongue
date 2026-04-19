@@ -856,12 +856,50 @@ async function insertTracks(tracks, source) {
     if (isRejectedTitle(title)) { rejected++; continue; }
 
     // 2. Determine the real artist
-    //    Priority: extracted from title > artist_lock fallback
-    //    For artist_lock sources, the lock IS the artist — no title parsing needed.
+    //    Priority: extracted from title text > artist_lock fallback
+    //
+    //    When using the artist_lock fallback we ALSO check the Deezer publisher
+    //    name (track.artist.name). If the publisher name starts with the locked
+    //    artist name it's a legitimate tribute (e.g. "Adele Karaoke Band").
+    //    But if it's a name like "Adele Kraic" — a real person who is NOT the
+    //    locked artist — we require the title to explicitly attribute the song
+    //    (e.g. "Jar of Hearts (Originally Performed By Christina Perri)").
+    //    Without that attribution we can't be sure what artist this song is for,
+    //    so we reject it.
     let realArtist = extractOriginalArtist(track);
     if (!realArtist) {
       if (source.artist_lock) {
-        realArtist = source.artist_lock; // use the locked artist directly
+        // Check the Deezer publisher name against the lock before falling back.
+        const publisherName = (track.artist && track.artist.name) ? track.artist.name : '';
+        const publisherNorm = normArtist(publisherName);
+        const lockNorm2     = normArtist(source.artist_lock);
+
+        // Known karaoke publisher keywords — these are fine as suffixes
+        const KARAOKE_PUBLISHER_KW = [
+          'karaoke','tribute','sesh','hits','singers','band','orchestra',
+          'backing','instrumental','factory','allstars','all stars','players',
+          'session','crew','zone','crew','artists','club','ensemble',
+        ];
+        const publisherSuffix = publisherNorm.replace(lockNorm2, '').trim();
+        const suffixIsKaraoke = !publisherSuffix ||
+          KARAOKE_PUBLISHER_KW.some(kw => publisherSuffix.includes(kw));
+
+        // Accept if publisher name starts with the locked artist name AND
+        // any suffix words are recognisable karaoke publisher terms.
+        // Reject if the publisher name looks like a different real person
+        // (e.g. "Adele Kraic" — extra word not in the karaoke publisher list).
+        if (publisherNorm.startsWith(lockNorm2) && suffixIsKaraoke) {
+          realArtist = source.artist_lock;
+        } else if (!publisherNorm.startsWith(lockNorm2)) {
+          // Publisher name doesn't even start with the locked artist — fine,
+          // many publishers use generic names like "Karaoke SESH".
+          realArtist = source.artist_lock;
+        } else {
+          // Publisher name starts with locked artist but has a suspicious suffix
+          // that isn't a karaoke keyword (e.g. "Adele Kraic", "Adele Smith").
+          // No title attribution either — reject to be safe.
+          rejected++; continue;
+        }
       } else {
         rejected++; continue; // no artist and no lock — skip
       }
