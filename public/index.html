@@ -552,11 +552,17 @@ async function startGame(){
     showScreen('setup'); return;
   }
 
-  setLoadUI('Ready!',`${songs.length} songs loaded`,100);
-  await new Promise(r=>setTimeout(r,500));
+  const actualRounds = songs.length;
+  if(actualRounds < rounds){
+    setLoadUI('Heads up!',`Only ${actualRounds} songs found — adjusting to ${actualRounds} rounds`,90);
+    await new Promise(r=>setTimeout(r,1800));
+  } else {
+    setLoadUI('Ready!',`${songs.length} songs loaded`,100);
+    await new Promise(r=>setTimeout(r,500));
+  }
 
   G.players=players; G.scores=Object.fromEntries(players.map(p=>[p,0]));
-  G.round=1; G.totalRounds=rounds; G.songs=songs;
+  G.round=1; G.totalRounds=actualRounds; G.songs=songs;
   G.currentSongIdx=0; G.currentPlayerIdx=0;
   G.mode=isArtistMode?'artist':'genre';
   G.lockedArtist=isArtistMode?artist:null;
@@ -619,9 +625,16 @@ async function beginRound(){
   } catch(e){ console.error('Preview error:',e); }
 
   if(!previewUrl){
-    setVinyl('error'); setStatus('warn','⚠ No preview found — skipping');
-    disableGuess(true); document.getElementById('next-area').style.display='block';
-    setTimeout(()=>nextRound(),1800); return;
+    setVinyl('error'); setStatus('warn','⚠ No preview available — trying next song');
+    disableGuess(true);
+    // Don't count this as a round — silently move to the next song index
+    // without incrementing G.round or G.currentPlayerIdx
+    G.currentSongIdx++;
+    if(G.currentSongIdx>=G.songs.length){
+      // Ran out of songs — end game
+      showResults(); return;
+    }
+    setTimeout(()=>beginRound(),1200); return;
   }
 
   setVinyl('playing'); setStatus('play','▶ Now playing — name this song!');
