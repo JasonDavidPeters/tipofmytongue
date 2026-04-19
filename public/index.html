@@ -326,6 +326,110 @@
     .card        { padding:18px; }
     .timer-digits { font-size:40px; }
   }
+
+  /* ── AUTH MODAL ──────────────────────────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 99990; padding: 20px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    width: 100%; max-width: 420px; padding: 32px;
+    position: relative; animation: slideUp 0.25s ease;
+  }
+  .modal::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+  }
+  .modal-title {
+    font-family: 'Bebas Neue', sans-serif; font-size: 28px;
+    letter-spacing: 2px; color: var(--accent); margin-bottom: 24px;
+  }
+  .modal-tabs {
+    display: flex; gap: 0; margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-tab {
+    padding: 10px 20px; background: none; border: none;
+    color: var(--muted); cursor: pointer; font-family: 'DM Sans', sans-serif;
+    font-size: 14px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; border-bottom: 2px solid transparent;
+    transition: all 0.15s; margin-bottom: -1px;
+  }
+  .modal-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .modal-close {
+    position: absolute; top: 16px; right: 16px;
+    background: none; border: none; color: var(--muted);
+    font-size: 20px; cursor: pointer; line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+  .auth-error {
+    padding: 10px 14px; background: rgba(255,77,109,0.08);
+    border: 1px solid rgba(255,77,109,0.3); color: var(--accent2);
+    font-size: 13px; margin-bottom: 16px; display: none;
+  }
+  .auth-error.show { display: block; }
+  /* Avatar grid */
+  .avatar-grid {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px;
+    margin: 8px 0 16px;
+  }
+  .avatar-opt {
+    aspect-ratio: 1; border: 2px solid var(--border);
+    background: var(--surface2); cursor: pointer;
+    font-size: 22px; display: flex; align-items: center;
+    justify-content: center; transition: all 0.15s; border-radius: 4px;
+  }
+  .avatar-opt:hover { border-color: var(--accent); transform: scale(1.08); }
+  .avatar-opt.selected {
+    border-color: var(--accent); background: rgba(232,255,71,0.08);
+    box-shadow: 0 0 0 2px rgba(232,255,71,0.25);
+  }
+  /* Profile button */
+  .profile-btn {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 14px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    transition: all 0.15s; clip-path: polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);
+  }
+  .profile-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .profile-btn .avatar-emoji { font-size: 18px; }
+  /* Profile dropdown */
+  .profile-dropdown {
+    position: absolute; top: calc(100% + 8px); right: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    min-width: 200px; z-index: 999; display: none; padding: 8px 0;
+  }
+  .profile-dropdown.open { display: block; }
+  .pd-header {
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--muted);
+  }
+  .pd-header strong { display: block; color: var(--text); font-size: 14px; margin-bottom: 2px; }
+  .pd-role {
+    display: inline-block; padding: 1px 7px; font-size: 10px;
+    letter-spacing: 1px; text-transform: uppercase; font-weight: 700;
+    border-radius: 2px;
+  }
+  .pd-role.user     { background: rgba(107,122,141,0.2); color: var(--muted); }
+  .pd-role.developer{ background: rgba(77,255,180,0.15); color: var(--accent3); }
+  .pd-role.admin    { background: rgba(255,77,109,0.15); color: var(--accent2); }
+  .pd-item {
+    padding: 10px 16px; font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; gap: 10px; color: var(--text);
+    transition: background 0.1s;
+  }
+  .pd-item:hover { background: var(--surface2); }
+  .pd-item.danger { color: var(--accent2); }
+  /* Home nav bar */
+  #home-nav {
+    position: absolute; top: 20px; right: 20px; z-index: 10;
+  }
+
 </style>
 </head>
 <body>
@@ -1294,7 +1398,297 @@ function confirmQuit(){
 window.addEventListener('DOMContentLoaded', () => {
   renderPlayers();
   initTestingMode();
+  initAuth();
+});
+
+// ── Auth state ────────────────────────────────────────────────────────────────
+let currentUser    = null;
+let authToken      = localStorage.getItem('toyt_token') || null;
+let selectedAvatar = 'vinyl';
+let availableAvatars = [];
+
+// ── Auth API helper ───────────────────────────────────────────────────────────
+async function authFetch(url, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+  return fetch(url, { ...opts, headers });
+}
+
+// ── Init on load ──────────────────────────────────────────────────────────────
+async function initAuth() {
+  // Load available avatars from server
+  try {
+    const r = await fetch('/api/auth/avatars');
+    const d = await r.json();
+    availableAvatars = d.avatars || [];
+    buildAvatarGrid();
+  } catch(e) { console.warn('Could not load avatars:', e.message); }
+
+  // Restore session from stored token
+  if (authToken) {
+    try {
+      const r = await authFetch('/api/auth/me');
+      if (r.ok) {
+        const d = await r.json();
+        currentUser = d.user;
+        updateProfileUI();
+        return;
+      }
+    } catch(e) {}
+    // Token is stale — clear it
+    authToken = null;
+    localStorage.removeItem('toyt_token');
+  }
+  updateProfileUI();
+}
+
+// ── Profile UI ────────────────────────────────────────────────────────────────
+function updateProfileUI() {
+  const emoji = document.getElementById('home-avatar-emoji');
+  const label = document.getElementById('home-profile-label');
+  if (currentUser) {
+    const av = availableAvatars.find(a => a.id === currentUser.avatar);
+    emoji.textContent = av ? av.emoji : '🎵';
+    label.textContent = currentUser.username;
+    document.getElementById('pd-username').textContent = currentUser.username;
+    const roleEl = document.getElementById('pd-role');
+    roleEl.textContent = currentUser.role;
+    roleEl.className   = 'pd-role ' + currentUser.role;
+  } else {
+    emoji.textContent = '👤';
+    label.textContent = 'Sign In';
+  }
+}
+
+function toggleProfileDropdown() {
+  if (!currentUser) { openAuthModal('login'); return; }
+  document.getElementById('profile-dropdown').classList.toggle('open');
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('#home-nav')) {
+    const d = document.getElementById('profile-dropdown');
+    if (d) d.classList.remove('open');
+  }
+});
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function openAuthModal(tab) {
+  document.getElementById('profile-dropdown').classList.remove('open');
+  document.getElementById('auth-modal').classList.add('open');
+  switchTab(tab || 'login');
+  clearAuthError();
+}
+
+function closeAuthModal() {
+  document.getElementById('auth-modal').classList.remove('open');
+  clearAuthError();
+}
+
+function switchTab(tab) {
+  document.getElementById('form-login').style.display    = tab === 'login'    ? '' : 'none';
+  document.getElementById('form-register').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('tab-login').classList.toggle('active',    tab === 'login');
+  document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+  clearAuthError();
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+function clearAuthError() {
+  const el = document.getElementById('auth-error');
+  if (el) el.classList.remove('show');
+}
+
+// Close modal on overlay click
+document.getElementById('auth-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeAuthModal();
+});
+
+// ── Avatar grid ───────────────────────────────────────────────────────────────
+function buildAvatarGrid() {
+  const grid = document.getElementById('avatar-grid');
+  if (!grid || !availableAvatars.length) return;
+  grid.innerHTML = '';
+  availableAvatars.forEach(av => {
+    const el = document.createElement('div');
+    el.className   = 'avatar-opt' + (av.id === selectedAvatar ? ' selected' : '');
+    el.title       = av.label;
+    el.textContent = av.emoji;
+    el.onclick = () => {
+      selectedAvatar = av.id;
+      grid.querySelectorAll('.avatar-opt').forEach(o => o.classList.remove('selected'));
+      el.classList.add('selected');
+    };
+    grid.appendChild(el);
+  });
+}
+
+// ── Login ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  const email    = (document.getElementById('login-email').value    || '').trim();
+  const password =  document.getElementById('login-password').value || '';
+  if (!email || !password) { showAuthError('Please fill in all fields'); return; }
+  clearAuthError();
+  try {
+    const r = await fetch('/api/auth/login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password }),
+    });
+    const d = await r.json();
+    if (!r.ok) { showAuthError(d.error || 'Login failed'); return; }
+    authToken   = d.token;
+    currentUser = d.user;
+    localStorage.setItem('toyt_token', authToken);
+    closeAuthModal();
+    updateProfileUI();
+    showToast('Welcome back, ' + currentUser.username + '!', 'success');
+  } catch(e) {
+    showAuthError('Network error — please try again');
+  }
+}
+
+// ── Register ──────────────────────────────────────────────────────────────────
+async function doRegister() {
+  const username = (document.getElementById('reg-username').value || '').trim();
+  const email    = (document.getElementById('reg-email').value    || '').trim();
+  const password =  document.getElementById('reg-password').value || '';
+  if (!username || !email || !password) { showAuthError('Please fill in all fields'); return; }
+  clearAuthError();
+  try {
+    const r = await fetch('/api/auth/register', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ username, email, password, avatar: selectedAvatar }),
+    });
+    const d = await r.json();
+    if (!r.ok) { showAuthError(d.error || 'Registration failed'); return; }
+    authToken   = d.token;
+    currentUser = d.user;
+    localStorage.setItem('toyt_token', authToken);
+    closeAuthModal();
+    updateProfileUI();
+    showToast('Welcome to TOYT, ' + currentUser.username + '! 🎵', 'success');
+  } catch(e) {
+    showAuthError('Network error — please try again');
+  }
+}
+
+// ── Logout ────────────────────────────────────────────────────────────────────
+async function doLogout() {
+  document.getElementById('profile-dropdown').classList.remove('open');
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch(e) {}
+  authToken = null; currentUser = null;
+  localStorage.removeItem('toyt_token');
+  updateProfileUI();
+  showToast('Signed out', 'info');
+}
+
+// ── Change avatar (inline prompt for MVP) ────────────────────────────────────
+async function openAvatarChange() {
+  document.getElementById('profile-dropdown').classList.remove('open');
+  if (!availableAvatars.length) return;
+  const lines = availableAvatars.map((a, i) => i + ': ' + a.emoji + '  ' + a.label).join('
+');
+  const input = prompt('Choose your avatar:
+
+' + lines + '
+
+Enter the number:');
+  const idx   = parseInt(input);
+  if (isNaN(idx) || !availableAvatars[idx]) return;
+  const av = availableAvatars[idx];
+  try {
+    const r = await authFetch('/api/auth/avatar', {
+      method: 'PUT',
+      body:   JSON.stringify({ avatar: av.id }),
+    });
+    if (r.ok) {
+      currentUser.avatar = av.id;
+      updateProfileUI();
+      showToast('Avatar updated to ' + av.emoji, 'success');
+    }
+  } catch(e) {}
+}
+
+// Enter key submits whichever auth form is visible
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (!document.getElementById('auth-modal').classList.contains('open')) return;
+  if (document.getElementById('form-login').style.display !== 'none') doLogin();
+  else doRegister();
 });
 </script>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="auth-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAuthModal()">✕</button>
+    <div class="modal-tabs">
+      <button class="modal-tab active" id="tab-login"    onclick="switchTab('login')">Login</button>
+      <button class="modal-tab"        id="tab-register" onclick="switchTab('register')">Register</button>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+
+    <!-- LOGIN -->
+    <div id="form-login">
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="login-email"    type="email"    placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary w-full" onclick="doLogin()" style="margin-top:8px;">Login →</button>
+    </div>
+
+    <!-- REGISTER -->
+    <div id="form-register" style="display:none;">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input class="form-input" id="reg-username" type="text"     placeholder="YourName" maxlength="24" autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="reg-email"    type="email"    placeholder="you@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input class="form-input" id="reg-password" type="password" placeholder="Min 8 characters" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Choose Your Avatar</label>
+        <div class="avatar-grid" id="avatar-grid"></div>
+      </div>
+      <button class="btn btn-primary w-full" onclick="doRegister()">Create Account →</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROFILE DROPDOWN (home screen) -->
+<div id="home-nav">
+  <div style="position:relative;">
+    <button class="profile-btn" id="home-profile-btn" onclick="toggleProfileDropdown()">
+      <span class="avatar-emoji" id="home-avatar-emoji">👤</span>
+      <span id="home-profile-label">Sign In</span>
+    </button>
+    <div class="profile-dropdown" id="profile-dropdown">
+      <div class="pd-header">
+        <strong id="pd-username">—</strong>
+        <span class="pd-role user" id="pd-role">user</span>
+      </div>
+      <div class="pd-item" onclick="openAvatarChange()">🎨 &nbsp;Change Avatar</div>
+      <div class="pd-item danger" onclick="doLogout()">⏏ &nbsp;Sign Out</div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
