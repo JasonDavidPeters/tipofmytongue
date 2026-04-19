@@ -191,6 +191,139 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// ─── GET /api/admin/fix-years ─────────────────────────────────────────────────
+// Backfills decade=null rows using the Deezer cross-reference year lookup.
+// Runs in the background — responds immediately with "started".
+// Call: GET /api/admin/fix-years?secret=X
+// Optional: ?artist=Adele to only fix one artist's songs.
+app.get('/api/admin/fix-years', async (req, res) => {
+  const secret = process.env.ADMIN_SECRET;
+  const hasDev = req.user && (req.user.role === 'developer' || req.user.role === 'admin');
+  if (!TESTING && !hasDev && secret && req.query.secret !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const artistFilter = req.query.artist || null;
+  res.json({ message: 'Year fix started in background', artist: artistFilter || 'all' });
+
+  // Run async
+  (async () => {
+    try {
+      // Inline the karaoke-filtering logic here since we can't import from catalog.js easily
+      const KARAOKE_ALBUM_KW = [
+        'karaoke','instrumental','backing track','tribute','in the style',
+        'made famous','originally performed','cover','sing along','minus one',
+      ];
+      function isKaraokeTrack(t) {
+        const tt = (t.title || '').toLowerCase();
+        const at = (t.album && t.album.title ? t.album.title : '').toLowerCase();
+        const ar = (t.artist && t.artist.name ? t.artist.name : '').toLowerCase();
+        if (KARAOKE_ALBUM_KW.some(kw => tt.includes(kw))) return true;
+        if (KARAOKE_ALBUM_KW.some(kw => at.includes(kw))) return true;
+        if (['karaoke','tribute','hits factory','sing'].some(kw => ar.includes(kw))) return true;
+        return false;
+      }
+
+      async function getDeezerYear(title, artist) {
+        const queries = [
+          `artist:"${artist}" track:"${title}"`,
+          `${title} ${artist}`,
+        ];
+        let bestYear = null;
+        for (const q of queries) {
+          if (bestYear !== null) break;
+          try {
+            const r = await fetch(
+              `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=20`,
+              { signal: AbortSignal.timeout(8000) }
+            );
+            if (!r.ok) continue;
+            const d = await r.json();
+            for (const t of (d.data || [])) {
+              if (isKaraokeTrack(t)) continue;
+              const y = parseInt((t.album && t.album.release_date ? t.album.release_date : '').slice(0, 4));
+              if (!isNaN(y) && y >= 1920 && y <= 2030) {
+                if (bestYear === null || y < bestYear) bestYear = y;
+              }
+            }
+          } catch (e) { /* try next */ }
+          await new Promise(r => setTimeout(r, 150));
+        }
+        return bestYear;
+      }
+
+      // Fetch all songs with null decade
+      let sql = 'SELECT id, title, artist FROM songs WHERE decade IS NULL AND enabled = true';
+      const params = [];
+      if (artistFilter) { params.push(artistFilter); sql += ' AND lower(artist) = lower($1)'; }
+      sql += ' ORDER BY artist, title';
+
+      const { rows } = await pool.query(sql, params);
+      console.log(`[fix-years] Fixing ${rows.length} songs with unknown year${artistFilter ? ' for ' + artistFilter : ''}`);
+
+      let fixed = 0, failed = 0;
+      for (const song of rows) {
+        const year = await getDeezerYear(song.title, song.artist);
+        if (year) {
+          await pool.query('UPDATE songs SET decade = $1 WHERE id = $2', [year, song.id]);
+          console.log(`[fix-years] ${song.artist} — ${song.title}: ${year}`);
+          fixed++;
+        } else {
+          failed++;
+        }
+      }
+      console.log(`[fix-years] Done: ${fixed} fixed, ${failed} could not resolve`);
+    } catch (err) {
+      console.error('[fix-years] Error:', err.message);
+    }
+  })();
+});
+
+// ─── GET /api/admin/debug-year ────────────────────────────────────────────────
+// Shows exactly what Deezer returns for a year lookup — useful for debugging.
+// Call: GET /api/admin/debug-year?title=Hello&artist=Adele&secret=X
+app.get('/api/admin/debug-year', async (req, res) => {
+  const secret = process.env.ADMIN_SECRET;
+  const hasDev = req.user && (req.user.role === 'developer' || req.user.role === 'admin');
+  if (!TESTING && !hasDev && secret && req.query.secret !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  const { title, artist } = req.query;
+  if (!title || !artist) return res.status(400).json({ error: 'Need title and artist params' });
+
+  const KARAOKE_ALBUM_KW = ['karaoke','instrumental','backing track','tribute','in the style','made famous','originally performed','cover','sing along','minus one'];
+
+  try {
+    const q = `artist:"${artist}" track:"${title}"`;
+    const url = `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=20`;
+    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const d = await r.json();
+
+    const results = (d.data || []).map(t => ({
+      title:        t.title,
+      artist:       t.artist?.name,
+      album:        t.album?.title,
+      release_date: t.album?.release_date,
+      is_karaoke:   KARAOKE_ALBUM_KW.some(kw =>
+        (t.title || '').toLowerCase().includes(kw) ||
+        (t.album?.title || '').toLowerCase().includes(kw) ||
+        (t.artist?.name || '').toLowerCase().includes(kw)
+      ),
+    }));
+
+    const nonKaraoke = results.filter(r => !r.is_karaoke);
+    const bestYear = nonKaraoke.reduce((best, t) => {
+      const y = parseInt((t.release_date || '').slice(0, 4));
+      return (!isNaN(y) && y >= 1920 && (best === null || y < best)) ? y : best;
+    }, null);
+
+    res.json({ query: q, total: results.length, non_karaoke: nonKaraoke.length, best_year: bestYear, results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Artist-locked sources list (kept in sync with catalog.js) ───────────────
 // This is the canonical list of artists available in the Artist dropdown.
 // An artist appears here only if catalog.js has a source with artist_lock

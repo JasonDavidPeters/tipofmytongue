@@ -763,40 +763,61 @@ async function lookupOriginalYear(title, artist) {
   const key = title.toLowerCase() + '||' + artist.toLowerCase();
   if (deezerYearCache.has(key)) return deezerYearCache.get(key);
 
-  // Small delay to avoid hammering Deezer (we already delay in deezerFetch)
-  await new Promise(r => setTimeout(r, 100));
+  await new Promise(r => setTimeout(r, 120));
 
   try {
-    // Search for the original song — no karaoke/instrumental keywords
-    // Use Deezer's field-specific search: artist: and track: operators
-    const q = 'artist:"' + artist.replace(/"/g, '') + '" track:"' + title.replace(/"/g, '') + '"';
-    const url = 'https://api.deezer.com/search?q=' + encodeURIComponent(q) + '&limit=10';
+    // Strategy: search for the original song by artist+title, no karaoke keywords.
+    // We try two queries — field-specific first, then broader — and take the
+    // earliest plausible year from tracks that don't look like karaoke/cover albums.
+    const queries = [
+      'artist:"' + artist.replace(/"/g, '') + '" track:"' + title.replace(/"/g, '') + '"',
+      title.replace(/"/g, '') + ' ' + artist.replace(/"/g, ''),
+    ];
 
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) { deezerYearCache.set(key, null); return null; }
+    // Keywords that indicate a karaoke/tribute album (check album title too)
+    const KARAOKE_ALBUM_KW = [
+      'karaoke','instrumental','backing track','tribute','in the style',
+      'made famous','originally performed','cover','sing along','minus one',
+    ];
 
-    const data = await res.json();
-    const tracks = data.data || [];
+    function isKaraokeTrack(t) {
+      const trackTitle = (t.title || '').toLowerCase();
+      const albumTitle = (t.album && t.album.title ? t.album.title : '').toLowerCase();
+      const artistName = (t.artist && t.artist.name ? t.artist.name : '').toLowerCase();
+      // Skip if track title looks like karaoke
+      if (KARAOKE_ALBUM_KW.some(kw => trackTitle.includes(kw))) return true;
+      // Skip if album title looks like karaoke
+      if (KARAOKE_ALBUM_KW.some(kw => albumTitle.includes(kw))) return true;
+      // Skip if artist looks like a karaoke publisher (contains "karaoke", "hits", "tribute")
+      if (['karaoke','tribute','hits factory','sing'].some(kw => artistName.includes(kw))) return true;
+      return false;
+    }
 
-    // Find the earliest album release date across results
-    // Filter out obvious karaoke results and pick the earliest real release
     let bestYear = null;
-    for (const t of tracks) {
-      // Skip karaoke/instrumental results that snuck through
-      const titleLower = (t.title || '').toLowerCase();
-      if (INSTRUMENTAL_KEYWORDS.some(kw => titleLower.includes(kw))) continue;
 
-      const dateStr = t.album && t.album.release_date ? t.album.release_date : '';
-      const year    = parseInt(dateStr.slice(0, 4));
-      if (!isNaN(year) && year >= 1920 && year <= 2030) {
-        if (bestYear === null || year < bestYear) bestYear = year;
-      }
+    for (const q of queries) {
+      if (bestYear !== null) break;
+      try {
+        const url = 'https://api.deezer.com/search?q=' + encodeURIComponent(q) + '&limit=20';
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (!res.ok) continue;
+        const data = await res.json();
+
+        for (const t of (data.data || [])) {
+          if (isKaraokeTrack(t)) continue;
+          const dateStr = t.album && t.album.release_date ? t.album.release_date : '';
+          const year    = parseInt(dateStr.slice(0, 4));
+          if (!isNaN(year) && year >= 1920 && year <= 2030) {
+            if (bestYear === null || year < bestYear) bestYear = year;
+          }
+        }
+      } catch (e) { /* try next query */ }
     }
 
     deezerYearCache.set(key, bestYear);
     return bestYear;
   } catch (err) {
-    console.warn('  Deezer year lookup failed [' + title + ']:', err.message);
+    console.warn('  Year lookup failed [' + title + ']:', err.message);
     deezerYearCache.set(key, null);
     return null;
   }
