@@ -48,14 +48,121 @@
   .form-select { width:100%; background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:12px 16px; font-family:'DM Sans',sans-serif; font-size:15px; outline:none; appearance:none; cursor:pointer; }
   .form-group  { margin-bottom:18px; }
   .divider     { width:100%; height:1px; background:var(--border); }
-  /* HOME */
-  #screen-home { justify-content:center; gap:48px; }
-  .hero-section { display:flex; flex-direction:column; align-items:center; gap:20px; }
-  .tagline { color:var(--muted); font-size:15px; text-align:center; max-width:340px; line-height:1.65; }
-  .vinyl-anim { width:120px; height:120px; animation:spin 8s linear infinite; }
+  /* HOME — animated */
+  #screen-home {
+    justify-content: center; gap: 0; padding: 0;
+    min-height: 100vh; overflow: hidden; position: relative;
+  }
+  /* Particle canvas sits behind everything */
+  #home-canvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+  .home-inner {
+    position: relative; z-index: 2;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0;
+    min-height: 100vh; padding: 40px 20px;
+  }
+  /* Vinyl — bigger, glowing, with arm */
+  .vinyl-stage {
+    position: relative; width: 220px; height: 220px;
+    margin-bottom: 36px;
+  }
+  .vinyl-spin {
+    width: 220px; height: 220px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 50%, #1a1a1a 0%, #0a0a0a 18%,
+        #1e1e1e 19%, #111 35%, #1a1a1a 36%, #0d0d0d 52%,
+        #222 53%, #111 69%, #1a1a1a 70%, #060606 100%);
+    box-shadow:
+      0 0 0 2px #2a2a2a,
+      0 20px 80px rgba(0,0,0,0.9),
+      0 0 60px rgba(232,255,71,0.12);
+    animation: vinylSpin 2.5s linear infinite;
+  }
+  @keyframes vinylSpin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  .vinyl-label {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 70px; height: 70px; border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--accent), #b8cc00, var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 20px rgba(232,255,71,0.4);
+  }
+  .vinyl-label::after {
+    content: ''; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--bg);
+  }
+  /* Glow ring — pulses */
+  .vinyl-glow {
+    position: absolute; inset: -16px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(232,255,71,0.18) 0%, transparent 70%);
+    animation: glowPulse 2s ease-in-out infinite alternate;
+  }
+  @keyframes glowPulse {
+    from { opacity: 0.4; transform: scale(0.95); }
+    to   { opacity: 1;   transform: scale(1.05); }
+  }
+  /* Waveform bars */
+  .waveform {
+    display: flex; align-items: center; gap: 3px;
+    height: 32px; margin-bottom: 32px;
+  }
+  .waveform .bar {
+    width: 3px; border-radius: 2px;
+    background: var(--accent); opacity: 0.7;
+    animation: waveBounce var(--dur, 0.8s) ease-in-out infinite alternate;
+    animation-delay: var(--delay, 0s);
+  }
+  @keyframes waveBounce {
+    from { height: 4px;  opacity: 0.3; }
+    to   { height: var(--h, 28px); opacity: 0.9; }
+  }
+  /* Logo entrance */
+  .home-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 12vw, 108px);
+    letter-spacing: 3px; line-height: 0.88;
+    text-align: center;
+    animation: logoReveal 0.9s cubic-bezier(0.16,1,0.3,1) both;
+    animation-delay: 0.15s;
+  }
+  @keyframes logoReveal {
+    from { opacity: 0; transform: translateY(30px) skewX(-4deg); }
+    to   { opacity: 1; transform: translateY(0) skewX(0); }
+  }
+  .home-logo .accent { color: var(--accent); display: block; }
+  .home-logo .sub {
+    font-family: 'DM Sans', sans-serif;
+    font-size: clamp(9px,1.8vw,12px);
+    letter-spacing: 10px; color: var(--muted);
+    font-weight: 300; display: block;
+    margin-top: 12px;
+    animation: fadeSlide 0.8s ease both; animation-delay: 0.6s;
+  }
+  /* Tagline */
+  .home-tagline {
+    color: var(--muted); font-size: 15px; text-align: center;
+    max-width: 340px; line-height: 1.7; margin: 18px 0 36px;
+    animation: fadeSlide 0.8s ease both; animation-delay: 0.75s;
+  }
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  /* Buttons */
+  .home-menu {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 100%; max-width: 340px;
+    animation: fadeSlide 0.8s ease both; animation-delay: 0.9s;
+  }
+  .home-menu .btn {
+    width: 100%; justify-content: center;
+    padding: 18px 32px; font-size: 16px;
+  }
+  /* Floating note particles — done in JS on canvas */
   @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
-  .home-menu { display:flex; flex-direction:column; gap:14px; width:100%; max-width:380px; }
-  .home-menu .btn { width:100%; justify-content:center; padding:18px 32px; font-size:16px; }
   /* SETUP */
   #screen-setup { gap:28px; max-width:540px; margin:0 auto; }
   .setup-title { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:2px; color:var(--accent); margin-bottom:18px; }
@@ -232,20 +339,31 @@
 
 <!-- HOME -->
 <div id="screen-home" class="screen active">
-  <div class="hero-section">
-    <svg class="vinyl-anim" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="60" cy="60" r="58" fill="#111" stroke="#333" stroke-width="1"/>
-      <circle cx="60" cy="60" r="44" fill="none" stroke="#1a1a1a" stroke-width="1"/>
-      <circle cx="60" cy="60" r="28" fill="none" stroke="#222" stroke-width="1"/>
-      <circle cx="60" cy="60" r="13" fill="#e8ff47"/>
-      <circle cx="60" cy="60" r="4" fill="#080b10"/>
-    </svg>
-    <div class="logo">Tip of Your<br><span>Tongue</span><div class="sub">Music Trivia</div></div>
-    <p class="tagline">15 seconds. One instrumental. How fast can you name it?</p>
-  </div>
-  <div class="home-menu">
-    <button class="btn btn-primary" onclick="showSetup()">▶ &nbsp;Play Now</button>
-    <button class="btn btn-secondary" onclick="showScreen('howto')">? &nbsp;How to Play</button>
+  <canvas id="home-canvas"></canvas>
+  <div class="home-inner">
+    <!-- Animated vinyl -->
+    <div class="vinyl-stage">
+      <div class="vinyl-glow"></div>
+      <div class="vinyl-spin"></div>
+      <div class="vinyl-label"></div>
+    </div>
+
+    <!-- Waveform — 18 bars with staggered bounce -->
+    <div class="waveform" id="waveform"></div>
+
+    <!-- Logo -->
+    <div class="home-logo">
+      Tip of Your
+      <span class="accent">Tongue</span>
+      <span class="sub">Music Trivia</span>
+    </div>
+
+    <p class="home-tagline">15 seconds. One instrumental.<br>How fast can you name it?</p>
+
+    <div class="home-menu">
+      <button class="btn btn-primary" onclick="showSetup()">▶ &nbsp;Play Now</button>
+      <button class="btn btn-secondary" onclick="showScreen('howto')">? &nbsp;How to Play</button>
+    </div>
   </div>
 </div>
 
@@ -415,7 +533,7 @@
           </div>
         </div>
         <div>
-          <span class="guess-label">📅 Release Year</span>
+          <span class="guess-label">📅 Original Release Year</span>
           <div class="guess-wrap">
             <input class="guess-field" id="guess-year" type="number" min="1950" max="2030" placeholder="e.g. 1999" autocomplete="off">
           </div>
@@ -691,8 +809,14 @@ function endRound(){
   document.getElementById('reveal-area').innerHTML=`
     <div class="reveal-card">
       <div class="reveal-eyebrow">The answer was</div>
-      <div class="reveal-title">${song.title}${yearStr}</div>
+      <div class="reveal-title">${song.title}</div>
       <div class="reveal-artist">by ${song.artist}</div>
+      ${song.decade
+        ? `<div style="font-size:13px;color:var(--muted);margin-top:6px;letter-spacing:1px;">
+             📅 Originally released: <strong style="color:var(--accent);">${song.decade}</strong>
+           </div>`
+        : `<div style="font-size:12px;color:var(--muted);margin-top:6px;">📅 Release year unknown</div>`
+      }
       <div class="reveal-badges">${b}</div>
     </div>`;
   document.getElementById('next-area').style.display='block';
@@ -1062,6 +1186,110 @@ function showToast(msg,type='info'){
 function confirmQuit(){
   if(confirm('Quit the current game?')){G.active=false;clearInterval(G.timerInterval);stopAudio();showScreen('home');}
 }
+
+
+// ── Home screen animation ─────────────────────────────────────────────────────
+(function initHomeAnimations() {
+  // Build waveform bars
+  const wf = document.getElementById('waveform');
+  const heights = [10,18,26,20,32,14,28,32,24,32,28,14,32,20,26,18,10,6];
+  const delays  = [0,.12,.06,.18,.03,.15,.09,.0,.21,.04,.18,.08,.13,.05,.17,.11,.07,.2];
+  const durs    = [.7,.5,.6,.45,.55,.65,.5,.4,.6,.7,.5,.55,.45,.65,.5,.6,.7,.45];
+  heights.forEach((h, i) => {
+    const b = document.createElement('div');
+    b.className = 'bar';
+    b.style.cssText = `--h:${h}px;--delay:${delays[i]}s;--dur:${durs[i]}s`;
+    wf.appendChild(b);
+  });
+
+  // Floating music note particle system
+  const canvas = document.getElementById('home-canvas');
+  const ctx = canvas.getContext('2d');
+  const NOTES = ['♩','♪','♫','♬','♭','♮','𝅗𝅥'];
+  const COLOURS = ['rgba(232,255,71,','rgba(77,255,180,','rgba(255,77,109,','rgba(255,209,102,'];
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function spawnParticle() {
+    return {
+      x:     Math.random() * W,
+      y:     H + 20,
+      note:  NOTES[Math.floor(Math.random() * NOTES.length)],
+      col:   COLOURS[Math.floor(Math.random() * COLOURS.length)],
+      size:  10 + Math.random() * 22,
+      speed: 0.3 + Math.random() * 0.7,
+      drift: (Math.random() - 0.5) * 0.4,
+      spin:  (Math.random() - 0.5) * 0.02,
+      angle: 0,
+      alpha: 0,
+      fadeIn: 0.008 + Math.random() * 0.008,
+      life:  1,
+    };
+  }
+
+  // Seed initial particles spread across the screen height
+  for (let i = 0; i < 28; i++) {
+    const p = spawnParticle();
+    p.y = Math.random() * H;
+    p.alpha = Math.random() * 0.35;
+    p.life = Math.random();
+    particles.push(p);
+  }
+
+  let frameId;
+  let lastSpawn = 0;
+
+  function tick(ts) {
+    // Only animate while home screen is visible
+    if (!document.getElementById('screen-home').classList.contains('active')) {
+      ctx.clearRect(0, 0, W, H);
+      frameId = requestAnimationFrame(tick);
+      return;
+    }
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Spawn new particle every ~600ms
+    if (ts - lastSpawn > 600 && particles.length < 40) {
+      particles.push(spawnParticle());
+      lastSpawn = ts;
+    }
+
+    particles = particles.filter(p => {
+      // Move
+      p.y     -= p.speed;
+      p.x     += p.drift;
+      p.angle += p.spin;
+      p.life  -= 0.0008;
+
+      // Fade in then fade with life
+      if (p.alpha < 0.35) p.alpha += p.fadeIn;
+      const fade = Math.min(p.alpha, p.life * 1.5, 0.38);
+      if (fade <= 0 || p.y < -40) return false;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.globalAlpha = fade;
+      ctx.font = `${p.size}px serif`;
+      ctx.fillStyle = p.col + fade + ')';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.note, 0, 0);
+      ctx.restore();
+      return true;
+    });
+
+    frameId = requestAnimationFrame(tick);
+  }
+  frameId = requestAnimationFrame(tick);
+})();
 
 window.addEventListener('DOMContentLoaded', () => {
   renderPlayers();
