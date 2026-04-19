@@ -22,8 +22,6 @@
 
 const pool = require('./db');
 
-const MB_USER_AGENT = 'TipOfYourTongue/1.0 (music-trivia-game)';
-
 // ─── Instrumental keyword filter ──────────────────────────────────────────────
 const INSTRUMENTAL_KEYWORDS = [
   'instrumental', 'karaoke', 'backing track', 'backing version',
@@ -153,6 +151,18 @@ const KNOWN_YEARS = [
   ['When We Were Young', 'Adele', 2015], ['Send My Love', 'Adele', 2016],
   ['Water Under the Bridge', 'Adele', 2015], ['Oh My God', 'Adele', 2021],
   ['I Drink Wine', 'Adele', 2021], ['Hold On', 'Adele', 2021],
+  // Adele — additional songs & alternate title spellings used by Deezer publishers
+  ['Turning Tables', 'Adele', 2011], ['Lovesong', 'Adele', 2011],
+  ['Love Song', 'Adele', 2011], ['Hometown Glory', 'Adele', 2007],
+  ['Make You Feel My Love', 'Adele', 2008], ['One and Only', 'Adele', 2011],
+  ['Million Years Ago', 'Adele', 2015], ['All I Ask', 'Adele', 2015],
+  ['River Lea', 'Adele', 2015], ['Sweetest Devotion', 'Adele', 2015],
+  ['Remedy', 'Adele', 2015], ['Cold Shoulder', 'Adele', 2008],
+  ['Right as Rain', 'Adele', 2008], ['Crazy for You', 'Adele', 2008],
+  ['Daydreamer', 'Adele', 2008], [`Don't You Remember`, 'Adele', 2011],
+  ['Take It All', 'Adele', 2011], ['To Be Loved', 'Adele', 2021],
+  ['Can I Get It', 'Adele', 2021], ['Love Is a Game', 'Adele', 2021],
+  ['Cry Your Heart Out', 'Adele', 2021], ['Strangers by Nature', 'Adele', 2021],
 
   // Ariana Grande
   ['Thank U Next', 'Ariana Grande', 2018], ['7 Rings', 'Ariana Grande', 2019],
@@ -178,7 +188,7 @@ const KNOWN_YEARS = [
   ['Grenade', 'Bruno Mars', 2010], ['Locked Out of Heaven', 'Bruno Mars', 2012],
   ['24K Magic', 'Bruno Mars', 2016], ['Count on Me', 'Bruno Mars', 2010],
   ['The Lazy Song', 'Bruno Mars', 2010], ['Treasure', 'Bruno Mars', 2013],
-  ['When I Was Your Man', 'Bruno Mars', 2012], ['That\'s What I Like', 'Bruno Mars', 2016],
+  ['When I Was Your Man', 'Bruno Mars', 2012], [`That\'s What I Like`, 'Bruno Mars', 2016],
 
   // Coldplay
   ['Yellow', 'Coldplay', 2000], ['The Scientist', 'Coldplay', 2002],
@@ -192,12 +202,12 @@ const KNOWN_YEARS = [
   ['9 to 5', 'Dolly Parton', 1980], ['Coat of Many Colors', 'Dolly Parton', 1971],
 
   // Drake
-  ['God\'s Plan', 'Drake', 2018], ['Hotline Bling', 'Drake', 2015],
+  [`God\'s Plan`, 'Drake', 2018], ['Hotline Bling', 'Drake', 2015],
   ['One Dance', 'Drake', 2016], ['Started From the Bottom', 'Drake', 2013],
-  ['Hold On We\'re Going Home', 'Drake', 2013],
+  [`Hold On We\'re Going Home`, 'Drake', 2013],
 
   // Dua Lipa
-  ['Levitating', 'Dua Lipa', 2020], ['Don\'t Start Now', 'Dua Lipa', 2019],
+  ['Levitating', 'Dua Lipa', 2020], [`Don\'t Start Now`, 'Dua Lipa', 2019],
   ['New Rules', 'Dua Lipa', 2017], ['Physical', 'Dua Lipa', 2020],
   ['Blow Your Mind', 'Dua Lipa', 2016], ['Be the One', 'Dua Lipa', 2015],
   ['Break My Heart', 'Dua Lipa', 2020], ['One Kiss', 'Dua Lipa', 2018],
@@ -214,8 +224,8 @@ const KNOWN_YEARS = [
   // Elton John
   ['Rocket Man', 'Elton John', 1972], ['Tiny Dancer', 'Elton John', 1971],
   ['Crocodile Rock', 'Elton John', 1972], ['Your Song', 'Elton John', 1970],
-  ['Don\'t Let the Sun Go Down on Me', 'Elton John', 1974],
-  ['I\'m Still Standing', 'Elton John', 1983], ['Saturday Night\'s Alright', 'Elton John', 1973],
+  [`Don\'t Let the Sun Go Down on Me`, 'Elton John', 1974],
+  [`I\'m Still Standing`, 'Elton John', 1983], [`Saturday Night\'s Alright`, 'Elton John', 1973],
   ['Bennie and the Jets', 'Elton John', 1973], ['Candle in the Wind', 'Elton John', 1973],
 
   // Eminem
@@ -226,7 +236,7 @@ const KNOWN_YEARS = [
 
   // Garth Brooks
   ['Friends in Low Places', 'Garth Brooks', 1990], ['The Dance', 'Garth Brooks', 1990],
-  ['Thunder Rolls', 'Garth Brooks', 1990], ['Ain\'t Going Down', 'Garth Brooks', 1993],
+  ['Thunder Rolls', 'Garth Brooks', 1990], [`Ain\'t Going Down`, 'Garth Brooks', 1993],
 
   // Harry Styles
   ['Watermelon Sugar', 'Harry Styles', 2019], ['As It Was', 'Harry Styles', 2022],
@@ -264,7 +274,7 @@ const KNOWN_YEARS = [
   // Queen
   ['Bohemian Rhapsody', 'Queen', 1975], ['We Will Rock You', 'Queen', 1977],
   ['We Are the Champions', 'Queen', 1977], ['Somebody to Love', 'Queen', 1976],
-  ['Don\'t Stop Me Now', 'Queen', 1978], ['Under Pressure', 'Queen', 1981],
+  [`Don\'t Stop Me Now`, 'Queen', 1978], ['Under Pressure', 'Queen', 1981],
   ['Radio Ga Ga', 'Queen', 1984], ['I Want to Break Free', 'Queen', 1984],
   ['Another One Bites the Dust', 'Queen', 1980], ['Killer Queen', 'Queen', 1974],
   ['Bicycle Race', 'Queen', 1978], ['Fat Bottomed Girls', 'Queen', 1978],
@@ -277,14 +287,14 @@ const KNOWN_YEARS = [
 
   // Shania Twain
   ['Man! I Feel Like a Woman!', 'Shania Twain', 1999],
-  ['You\'re Still the One', 'Shania Twain', 1998],
-  ['That Don\'t Impress Me Much', 'Shania Twain', 1998],
+  [`You\'re Still the One`, 'Shania Twain', 1998],
+  [`That Don\'t Impress Me Much`, 'Shania Twain', 1998],
   ['From This Moment On', 'Shania Twain', 1998],
   ['Forever and for Always', 'Shania Twain', 2002],
-  ['I\'m Gonna Getcha Good!', 'Shania Twain', 2002],
+  [`I\'m Gonna Getcha Good!`, 'Shania Twain', 2002],
   ['Any Man of Mine', 'Shania Twain', 1995],
   ['Feel Like a Woman', 'Shania Twain', 1999],
-  ['Honey I\'m Home', 'Shania Twain', 1995],
+  [`Honey I\'m Home`, 'Shania Twain', 1995],
   ['Ka-Ching!', 'Shania Twain', 2002],
   ['Come On Over', 'Shania Twain', 1997],
   ['Whose Bed Have Your Boots Been Under?', 'Shania Twain', 1995],
@@ -305,7 +315,7 @@ const KNOWN_YEARS = [
 
   // The Weeknd
   ['Blinding Lights', 'The Weeknd', 2019], ['Starboy', 'The Weeknd', 2016],
-  ['Can\'t Feel My Face', 'The Weeknd', 2015], ['Save Your Tears', 'The Weeknd', 2020],
+  [`Can\'t Feel My Face`, 'The Weeknd', 2015], ['Save Your Tears', 'The Weeknd', 2020],
   ['The Hills', 'The Weeknd', 2015], ['Earned It', 'The Weeknd', 2015],
 
   // Whitney Houston
@@ -318,23 +328,23 @@ const KNOWN_YEARS = [
   // AC/DC
   ['Highway to Hell', 'AC/DC', 1979], ['Back in Black', 'AC/DC', 1980],
   ['Thunderstruck', 'AC/DC', 1990], ['You Shook Me All Night Long', 'AC/DC', 1980],
-  ['TNT', 'AC/DC', 1975], ['Rock and Roll Ain\'t Noise Pollution', 'AC/DC', 1980],
+  ['TNT', 'AC/DC', 1975], [`Rock and Roll Ain\'t Noise Pollution`, 'AC/DC', 1980],
 
   // Aerosmith
   ['Dream On', 'Aerosmith', 1973], ['Sweet Emotion', 'Aerosmith', 1975],
-  ['Walk This Way', 'Aerosmith', 1975], ['I Don\'t Want to Miss a Thing', 'Aerosmith', 1998],
-  ['Livin\' on the Edge', 'Aerosmith', 1993], ['Cryin\'', 'Aerosmith', 1993],
+  ['Walk This Way', 'Aerosmith', 1975], [`I Don\'t Want to Miss a Thing`, 'Aerosmith', 1998],
+  [`Livin\' on the Edge`, 'Aerosmith', 1993], [`Cryin\'`, 'Aerosmith', 1993],
   ['Crazy', 'Aerosmith', 1994], ['Amazing', 'Aerosmith', 1993],
 
   // Alicia Keys
-  ['Fallin\'', 'Alicia Keys', 2001], ['If I Ain\'t Got You', 'Alicia Keys', 2003],
+  [`Fallin\'`, 'Alicia Keys', 2001], [`If I Ain\'t Got You`, 'Alicia Keys', 2003],
   ['No One', 'Alicia Keys', 2007], ['Girl on Fire', 'Alicia Keys', 2012],
   ['Empire State of Mind', 'Alicia Keys', 2009], ['Superwoman', 'Alicia Keys', 2007],
 
   // Amy Winehouse
   ['Rehab', 'Amy Winehouse', 2006], ['Back to Black', 'Amy Winehouse', 2006],
   ['Valerie', 'Amy Winehouse', 2006], ['Tears Dry on Their Own', 'Amy Winehouse', 2007],
-  ['You Know I\'m No Good', 'Amy Winehouse', 2006],
+  [`You Know I\'m No Good`, 'Amy Winehouse', 2006],
 
   // Aretha Franklin
   ['Respect', 'Aretha Franklin', 1967], ['Think', 'Aretha Franklin', 1968],
@@ -357,16 +367,16 @@ const KNOWN_YEARS = [
   // Beatles
   ['Hey Jude', 'Beatles', 1968], ['Let It Be', 'Beatles', 1970],
   ['Come Together', 'Beatles', 1969], ['Yesterday', 'Beatles', 1965],
-  ['A Hard Day\'s Night', 'Beatles', 1964], ['Help!', 'Beatles', 1965],
+  [`A Hard Day\'s Night`, 'Beatles', 1964], ['Help!', 'Beatles', 1965],
   ['Twist and Shout', 'Beatles', 1963], ['Love Me Do', 'Beatles', 1962],
   ['Eleanor Rigby', 'Beatles', 1966], ['Blackbird', 'Beatles', 1968],
   ['In My Life', 'Beatles', 1965], ['Something', 'Beatles', 1969],
   ['Here Comes the Sun', 'Beatles', 1969], ['Ob-La-Di Ob-La-Da', 'Beatles', 1968],
 
   // Bon Jovi
-  ['Livin\' on a Prayer', 'Bon Jovi', 1986], ['You Give Love a Bad Name', 'Bon Jovi', 1986],
+  [`Livin\' on a Prayer`, 'Bon Jovi', 1986], ['You Give Love a Bad Name', 'Bon Jovi', 1986],
   ['Wanted Dead or Alive', 'Bon Jovi', 1986], ['Bad Medicine', 'Bon Jovi', 1988],
-  ['Always', 'Bon Jovi', 1994], ['It\'s My Life', 'Bon Jovi', 2000],
+  ['Always', 'Bon Jovi', 1994], [`It\'s My Life`, 'Bon Jovi', 2000],
   ['Have a Nice Day', 'Bon Jovi', 2005],
 
   // Britney Spears
@@ -387,8 +397,8 @@ const KNOWN_YEARS = [
   ['How Deep Is Your Love', 'Calvin Harris', 2015],
 
   // Coolio
-  ['Gangsta\'s Paradise', 'Coolio', 1995], ['Fantastic Voyage', 'Coolio', 1994],
-  ['1 2 3 4 (Sumpin\' New)', 'Coolio', 1996], ['C U When U Get There', 'Coolio', 1997],
+  [`Gangsta\'s Paradise`, 'Coolio', 1995], ['Fantastic Voyage', 'Coolio', 1994],
+  [`1 2 3 4 (Sumpin\' New)`, 'Coolio', 1996], ['C U When U Get There', 'Coolio', 1997],
 
   // Daft Punk
   ['Get Lucky', 'Daft Punk', 2013], ['One More Time', 'Daft Punk', 2000],
@@ -398,7 +408,7 @@ const KNOWN_YEARS = [
 
   // David Bowie
   ['Heroes', 'David Bowie', 1977], ['Space Oddity', 'David Bowie', 1969],
-  ['Ziggy Stardust', 'David Bowie', 1972], ['Let\'s Dance', 'David Bowie', 1983],
+  ['Ziggy Stardust', 'David Bowie', 1972], [`Let\'s Dance`, 'David Bowie', 1983],
   ['Rebel Rebel', 'David Bowie', 1974], ['Golden Years', 'David Bowie', 1975],
   ['Fame', 'David Bowie', 1975], ['Life on Mars?', 'David Bowie', 1971],
   ['Changes', 'David Bowie', 1971], ['Under Pressure', 'David Bowie', 1981],
@@ -409,18 +419,18 @@ const KNOWN_YEARS = [
   ['Dangerous', 'David Guetta', 2014], ['Hey Mama', 'David Guetta', 2015],
 
   // DMX
-  ['Party Up', 'DMX', 1999], ['X Gon\' Give It to Ya', 'DMX', 2003],
-  ['Ruff Ryders Anthem', 'DMX', 1998], ['Slippin\'', 'DMX', 1998],
+  ['Party Up', 'DMX', 1999], [`X Gon\' Give It to Ya`, 'DMX', 2003],
+  ['Ruff Ryders Anthem', 'DMX', 1998], [`Slippin\'`, 'DMX', 1998],
 
   // Dr. Dre
   ['Still D.R.E.', 'Dr. Dre', 1999], ['The Next Episode', 'Dr. Dre', 1999],
-  ['Forgot About Dre', 'Dr. Dre', 1999], ['Nuthin\' But a G Thang', 'Dr. Dre', 1992],
+  ['Forgot About Dre', 'Dr. Dre', 1999], [`Nuthin\' But a G Thang`, 'Dr. Dre', 1992],
   ['Let Me Ride', 'Dr. Dre', 1992], ['Xxplosive', 'Dr. Dre', 1999],
 
   // Eagles
   ['Hotel California', 'Eagles', 1976], ['Take It Easy', 'Eagles', 1972],
   ['Desperado', 'Eagles', 1973], ['Life in the Fast Lane', 'Eagles', 1977],
-  ['Lyin\' Eyes', 'Eagles', 1975], ['One of These Nights', 'Eagles', 1975],
+  [`Lyin\' Eyes`, 'Eagles', 1975], ['One of These Nights', 'Eagles', 1975],
   ['Peaceful Easy Feeling', 'Eagles', 1972], ['Best of My Love', 'Eagles', 1974],
 
   // Fleetwood Mac
@@ -443,7 +453,7 @@ const KNOWN_YEARS = [
 
   // James Brown
   ['I Got You', 'James Brown', 1965], ['Sex Machine', 'James Brown', 1970],
-  ['Papa\'s Got a Brand New Bag', 'James Brown', 1965],
+  [`Papa\'s Got a Brand New Bag`, 'James Brown', 1965],
   ['Please Please Please', 'James Brown', 1956], ['Super Bad', 'James Brown', 1970],
   ['Living in America', 'James Brown', 1985],
 
@@ -460,7 +470,7 @@ const KNOWN_YEARS = [
   // Justin Timberlake
   ['Cry Me a River', 'Justin Timberlake', 2002], ['SexyBack', 'Justin Timberlake', 2006],
   ['What Goes Around', 'Justin Timberlake', 2006], ['Mirrors', 'Justin Timberlake', 2013],
-  ['Can\'t Stop the Feeling!', 'Justin Timberlake', 2016],
+  [`Can\'t Stop the Feeling!`, 'Justin Timberlake', 2016],
   ['Rock Your Body', 'Justin Timberlake', 2003], ['My Love', 'Justin Timberlake', 2006],
 
   // Kanye West
@@ -471,7 +481,7 @@ const KNOWN_YEARS = [
 
   // Kendrick Lamar
   ['HUMBLE.', 'Kendrick Lamar', 2017], ['Swimming Pools', 'Kendrick Lamar', 2012],
-  ['Bitch Don\'t Kill My Vibe', 'Kendrick Lamar', 2012],
+  [`Bitch Don\'t Kill My Vibe`, 'Kendrick Lamar', 2012],
   ['King Kunta', 'Kendrick Lamar', 2015], ['DNA.', 'Kendrick Lamar', 2017],
   ['Alright', 'Kendrick Lamar', 2015], ['Money Trees', 'Kendrick Lamar', 2012],
 
@@ -488,24 +498,24 @@ const KNOWN_YEARS = [
 
   // Lil Nas X
   ['Old Town Road', 'Lil Nas X', 2019], ['MONTERO', 'Lil Nas X', 2021],
-  ['Industry Baby', 'Lil Nas X', 2021], ['STAR WALKIN\'', 'Lil Nas X', 2022],
-  ['That\'s What I Want', 'Lil Nas X', 2021],
+  ['Industry Baby', 'Lil Nas X', 2021], [`STAR WALKIN\'`, 'Lil Nas X', 2022],
+  [`That\'s What I Want`, 'Lil Nas X', 2021],
 
   // Luke Bryan
-  ['Country Girl', 'Luke Bryan', 2011], ['That\'s My Kind of Night', 'Luke Bryan', 2013],
+  ['Country Girl', 'Luke Bryan', 2011], [`That\'s My Kind of Night`, 'Luke Bryan', 2013],
   ['Play It Again', 'Luke Bryan', 2014], ['Drink a Beer', 'Luke Bryan', 2013],
   ['Crash My Party', 'Luke Bryan', 2013], ['Light It Up', 'Luke Bryan', 2014],
 
   // Madonna
   ['Like a Prayer', 'Madonna', 1989], ['Material Girl', 'Madonna', 1984],
-  ['Like a Virgin', 'Madonna', 1984], ['Papa Don\'t Preach', 'Madonna', 1986],
+  ['Like a Virgin', 'Madonna', 1984], [`Papa Don\'t Preach`, 'Madonna', 1986],
   ['Vogue', 'Madonna', 1990], ['Frozen', 'Madonna', 1998],
   ['Ray of Light', 'Madonna', 1998], ['Hung Up', 'Madonna', 2005],
   ['Holiday', 'Madonna', 1983], ['True Blue', 'Madonna', 1986],
 
   // Marvin Gaye
-  ['Sexual Healing', 'Marvin Gaye', 1982], ['Let\'s Get It On', 'Marvin Gaye', 1973],
-  ['What\'s Going On', 'Marvin Gaye', 1971], ['Heard It Through the Grapevine', 'Marvin Gaye', 1968],
+  ['Sexual Healing', 'Marvin Gaye', 1982], [`Let\'s Get It On`, 'Marvin Gaye', 1973],
+  [`What\'s Going On`, 'Marvin Gaye', 1971], ['Heard It Through the Grapevine', 'Marvin Gaye', 1968],
   ['Mercy Mercy Me', 'Marvin Gaye', 1971], ['Got to Give It Up', 'Marvin Gaye', 1977],
   ['I Heard It Through the Grapevine', 'Marvin Gaye', 1968],
 
@@ -521,8 +531,8 @@ const KNOWN_YEARS = [
 
   // NSYNC
   ['Bye Bye Bye', 'NSYNC', 2000], ['I Want You Back', 'NSYNC', 1996],
-  ['Tearing Up My Heart', 'NSYNC', 1997], ['It\'s Gonna Be Me', 'NSYNC', 2000],
-  ['God Must Have Spent', 'NSYNC', 1998], ['Tearin\' Up My Heart', 'NSYNC', 1997],
+  ['Tearing Up My Heart', 'NSYNC', 1997], [`It\'s Gonna Be Me`, 'NSYNC', 2000],
+  ['God Must Have Spent', 'NSYNC', 1998], [`Tearin\' Up My Heart`, 'NSYNC', 1997],
 
   // Nas
   ['N.Y. State of Mind', 'Nas', 1994], ['If I Ruled the World', 'Nas', 1996],
@@ -541,15 +551,15 @@ const KNOWN_YEARS = [
   ['One More Chance', 'Notorious B.I.G', 1995],
 
   // Oasis
-  ['Wonderwall', 'Oasis', 1995], ['Don\'t Look Back in Anger', 'Oasis', 1996],
+  ['Wonderwall', 'Oasis', 1995], [`Don\'t Look Back in Anger`, 'Oasis', 1996],
   ['Champagne Supernova', 'Oasis', 1995], ['Live Forever', 'Oasis', 1994],
   ['Some Might Say', 'Oasis', 1995], ['Stand by Me', 'Oasis', 1997],
   ['Half the World Away', 'Oasis', 1994],
 
   // Otis Redding
-  ['(Sittin\' On) The Dock of the Bay', 'Otis Redding', 1967],
+  [`(Sittin\' On) The Dock of the Bay`, 'Otis Redding', 1967],
   ['Try a Little Tenderness', 'Otis Redding', 1966],
-  ['Respect', 'Otis Redding', 1965], ['I\'ve Been Loving You Too Long', 'Otis Redding', 1965],
+  ['Respect', 'Otis Redding', 1965], [`I\'ve Been Loving You Too Long`, 'Otis Redding', 1965],
 
   // Pearl Jam
   ['Alive', 'Pearl Jam', 1991], ['Even Flow', 'Pearl Jam', 1992],
@@ -573,8 +583,8 @@ const KNOWN_YEARS = [
   // Rolling Stones
   ['Paint It Black', 'Rolling Stones', 1966], ['Sympathy for the Devil', 'Rolling Stones', 1968],
   ['Gimme Shelter', 'Rolling Stones', 1969], ['Start Me Up', 'Rolling Stones', 1981],
-  ['(I Can\'t Get No) Satisfaction', 'Rolling Stones', 1965],
-  ['Jumpin\' Jack Flash', 'Rolling Stones', 1968], ['Angie', 'Rolling Stones', 1973],
+  [`(I Can\'t Get No) Satisfaction`, 'Rolling Stones', 1965],
+  [`Jumpin\' Jack Flash`, 'Rolling Stones', 1968], ['Angie', 'Rolling Stones', 1973],
   ['Wild Horses', 'Rolling Stones', 1971], ['Miss You', 'Rolling Stones', 1978],
 
   // SZA
@@ -584,12 +594,12 @@ const KNOWN_YEARS = [
   ['Drew Barrymore', 'SZA', 2017], ['Broken Clocks', 'SZA', 2017],
 
   // Snoop Dogg
-  ['Gin and Juice', 'Snoop Dogg', 1994], ['Drop It Like It\'s Hot', 'Snoop Dogg', 2004],
+  ['Gin and Juice', 'Snoop Dogg', 1994], [`Drop It Like It\'s Hot`, 'Snoop Dogg', 2004],
   ['Beautiful', 'Snoop Dogg', 2003], ['Signs', 'Snoop Dogg', 2005],
   ['Doggy Dogg World', 'Snoop Dogg', 1993], ['Who Am I?', 'Snoop Dogg', 1993],
 
   // Spice Girls
-  ['Wannabe', 'Spice Girls', 1996], ['Say You\'ll Be There', 'Spice Girls', 1996],
+  ['Wannabe', 'Spice Girls', 1996], [`Say You\'ll Be There`, 'Spice Girls', 1996],
   ['2 Become 1', 'Spice Girls', 1996], ['Mama', 'Spice Girls', 1997],
   ['Who Do You Think You Are', 'Spice Girls', 1997], ['Stop', 'Spice Girls', 1997],
   ['Too Much', 'Spice Girls', 1997],
@@ -597,7 +607,7 @@ const KNOWN_YEARS = [
   // Stevie Wonder
   ['Superstition', 'Stevie Wonder', 1972], ['I Just Called to Say I Love You', 'Stevie Wonder', 1984],
   ['Sir Duke', 'Stevie Wonder', 1977], ['Happy Birthday', 'Stevie Wonder', 1980],
-  ['Isn\'t She Lovely', 'Stevie Wonder', 1976], ['Higher Ground', 'Stevie Wonder', 1973],
+  [`Isn\'t She Lovely`, 'Stevie Wonder', 1976], ['Higher Ground', 'Stevie Wonder', 1973],
   ['Signed Sealed Delivered', 'Stevie Wonder', 1970], ['Master Blaster', 'Stevie Wonder', 1980],
 
   // TLC
@@ -608,7 +618,7 @@ const KNOWN_YEARS = [
   // 2Pac
   ['California Love', '2Pac', 1995], ['Dear Mama', '2Pac', 1995],
   ['All Eyez on Me', '2Pac', 1996], ['Changes', '2Pac', 1998],
-  ['Gangsta Paradise', '2Pac', 1995], ['Hit \'Em Up', '2Pac', 1996],
+  ['Gangsta Paradise', '2Pac', 1995], [`Hit \'Em Up`, '2Pac', 1996],
   ['How Do U Want It', '2Pac', 1996], ['Keep Ya Head Up', '2Pac', 1993],
 
   // U2
@@ -622,16 +632,105 @@ const KNOWN_YEARS = [
   ['Yeah!', 'Usher', 2004], ['Confessions Part II', 'Usher', 2004],
   ['My Boo', 'Usher', 2004], ['Burn', 'Usher', 2004],
   ['Love in This Club', 'Usher', 2008], ['OMG', 'Usher', 2010],
-  ['DJ Got Us Fallin\' in Love', 'Usher', 2010], ['U Got It Bad', 'Usher', 2001],
+  [`DJ Got Us Fallin\' in Love`, 'Usher', 2010], ['U Got It Bad', 'Usher', 2001],
 
   // Van Halen
   ['Jump', 'Van Halen', 1984], ['Panama', 'Van Halen', 1984],
-  ['Hot for Teacher', 'Van Halen', 1984], ['Runnin\' with the Devil', 'Van Halen', 1978],
-  ['Eruption', 'Van Halen', 1978], ['Why Can\'t This Be Love', 'Van Halen', 1986],
+  ['Hot for Teacher', 'Van Halen', 1984], [`Runnin\' with the Devil`, 'Van Halen', 1978],
+  ['Eruption', 'Van Halen', 1978], [`Why Can\'t This Be Love`, 'Van Halen', 1986],
 
   // Warren G
   ['Regulate', 'Warren G', 1994], ['This DJ', 'Warren G', 1994],
-  ['What\'s Next', 'Warren G', 1994], ['I Want It All', 'Warren G', 1999],
+  [`What\'s Next`, 'Warren G', 1994], ['I Want It All', 'Warren G', 1999],
+
+  // Additional songs for major artists — more Deezer publisher coverage
+
+  // Dua Lipa extras
+  ['Future Nostalgia', 'Dua Lipa', 2020], ['Hallucinate', 'Dua Lipa', 2020],
+  ['Cool', 'Dua Lipa', 2020], ['Pretty Please', 'Dua Lipa', 2020],
+  ['Boys Will Be Boys', 'Dua Lipa', 2020], ['Love Again', 'Dua Lipa', 2020],
+  ['Prisoner', 'Dua Lipa', 2020], ['Electricity', 'Dua Lipa', 2018],
+  ['Genesis', 'Dua Lipa', 2017], ['Lost in Your Light', 'Dua Lipa', 2017],
+  [`Thinking 'Bout You`, 'Dua Lipa', 2017], ['Garden', 'Dua Lipa', 2017],
+
+  // Taylor Swift extras
+  ['Speak Now', 'Taylor Swift', 2010], ['Back to December', 'Taylor Swift', 2010],
+  ['Mean', 'Taylor Swift', 2011], ['Long Live', 'Taylor Swift', 2010],
+  ['Begin Again', 'Taylor Swift', 2012], ['Red', 'Taylor Swift', 2012],
+  ['Holy Ground', 'Taylor Swift', 2012], ['Treacherous', 'Taylor Swift', 2012],
+  ['Out of the Woods', 'Taylor Swift', 2014], ['Clean', 'Taylor Swift', 2014],
+  ['Getaway Car', 'Taylor Swift', 2017], ['Look What You Made Me Do', 'Taylor Swift', 2017],
+  [`Don't Blame Me`, 'Taylor Swift', 2017], ['Delicate', 'Taylor Swift', 2018],
+  ['Cornelia Street', 'Taylor Swift', 2019], ['London Boy', 'Taylor Swift', 2019],
+  ['Exile', 'Taylor Swift', 2020], ['august', 'Taylor Swift', 2020],
+  ['Betty', 'Taylor Swift', 2020], ['illicit affairs', 'Taylor Swift', 2020],
+  ['this is me trying', 'Taylor Swift', 2020], ['tolerate it', 'Taylor Swift', 2020],
+  ['Mastermind', 'Taylor Swift', 2022], ['Snow on the Beach', 'Taylor Swift', 2022],
+  ['Question...?', 'Taylor Swift', 2022], [`You're on Your Own Kid`, 'Taylor Swift', 2022],
+  ['Marjorie', 'Taylor Swift', 2020], ['right where you left me', 'Taylor Swift', 2020],
+
+  // Ed Sheeran extras
+  ['Lego House', 'Ed Sheeran', 2011], ['Drunk', 'Ed Sheeran', 2011],
+  ['Small Bump', 'Ed Sheeran', 2012], ['Give Me Love', 'Ed Sheeran', 2012],
+  ['Bloodstream', 'Ed Sheeran', 2015], ['Thinking Out Loud', 'Ed Sheeran', 2014],
+  [`Don't`, 'Ed Sheeran', 2014], ['Nina', 'Ed Sheeran', 2014],
+  ['Tenerife Sea', 'Ed Sheeran', 2014], [`Hearts Don't Break Around Here`, 'Ed Sheeran', 2017],
+  ['What Do I Know?', 'Ed Sheeran', 2017], ['New Man', 'Ed Sheeran', 2017],
+  ['Happier', 'Ed Sheeran', 2017], ['Perfect Duet', 'Ed Sheeran', 2017],
+  ['Remember the Name', 'Ed Sheeran', 2019], ['Cross Me', 'Ed Sheeran', 2019],
+  ['Put It All on Me', 'Ed Sheeran', 2019], ['Best Part of Me', 'Ed Sheeran', 2019],
+  ['Antisocial', 'Ed Sheeran', 2019], ['2step', 'Ed Sheeran', 2021],
+  ['Peru', 'Ed Sheeran', 2021], ['Visiting Hours', 'Ed Sheeran', 2021],
+  ['Celestial', 'Ed Sheeran', 2022], ['Eyes Closed', 'Ed Sheeran', 2023],
+
+  // Eminem extras
+  ['The Way I Am', 'Eminem', 2000], ['Kim', 'Eminem', 2000],
+  ['Marshall Mathers', 'Eminem', 2000], ['Criminal', 'Eminem', 2000],
+  ['Business', 'Eminem', 2002], [`Cleanin' Out My Closet`, 'Eminem', 2002],
+  [`When I'm Gone`, 'Eminem', 2005], ['Like Toy Soldiers', 'Eminem', 2004],
+  ['Mosh', 'Eminem', 2004], ['Mockingbird', 'Eminem', 2004],
+  [`Hailie's Song`, 'Eminem', 2002], [`When I'm Gone`, 'Eminem', 2005],
+  ['Beautiful', 'Eminem', 2009], ['Crack a Bottle', 'Eminem', 2009],
+  ['3 a.m.', 'Eminem', 2009], ['Medicine Ball', 'Eminem', 2009],
+  ['No Love', 'Eminem', 2010], ['Space Bound', 'Eminem', 2011],
+  ['The Monster', 'Eminem', 2013], ['Berzerk', 'Eminem', 2013],
+  ['Survival', 'Eminem', 2013], ['Guts Over Fear', 'Eminem', 2014],
+  ['Walk on Water', 'Eminem', 2017], ['River', 'Eminem', 2017],
+
+  // Justin Bieber extras
+  ['One Less Lonely Girl', 'Justin Bieber', 2009], ['Somebody to Love', 'Justin Bieber', 2010],
+  ['Boyfriend', 'Justin Bieber', 2012], ['Beauty and a Beat', 'Justin Bieber', 2012],
+  ['As Long as You Love Me', 'Justin Bieber', 2012], ['Right Here', 'Justin Bieber', 2012],
+  ['Confident', 'Justin Bieber', 2013], ['Hold Tight', 'Justin Bieber', 2013],
+  ['Where Are U Now', 'Justin Bieber', 2015], ['Company', 'Justin Bieber', 2016],
+  ['Cold Water', 'Justin Bieber', 2016], ['Friends', 'Justin Bieber', 2017],
+  ['Let Me Love You', 'Justin Bieber', 2016], ['Life Is Worth Living', 'Justin Bieber', 2015],
+  ['Love Yourself', 'Justin Bieber', 2015], ['Holy', 'Justin Bieber', 2020],
+  ['Lonely', 'Justin Bieber', 2020], ['Anyone', 'Justin Bieber', 2021],
+  ['Deserve You', 'Justin Bieber', 2021], ['Die in Your Arms', 'Justin Bieber', 2022],
+
+  // Queen extras
+  ['Crazy Little Thing Called Love', 'Queen', 1979],
+  ['A Kind of Magic', 'Queen', 1986], ['Innuendo', 'Queen', 1991],
+  ['The Show Must Go On', 'Queen', 1991], ['These Are the Days of Our Lives', 'Queen', 1991],
+  ['One Vision', 'Queen', 1985], ['Breakthru', 'Queen', 1989],
+  ['The Invisible Man', 'Queen', 1989], ['Headlong', 'Queen', 1991],
+  ['Flash', 'Queen', 1980], ['Save Me', 'Queen', 1980],
+  ['Play the Game', 'Queen', 1980], ['Spread Your Wings', 'Queen', 1978],
+  ['Good Old-Fashioned Lover Boy', 'Queen', 1977], ['Tie Your Mother Down', 'Queen', 1977],
+
+  // Shania Twain extras
+  ['Love Gets Me Every Time', 'Shania Twain', 1997],
+  ['Black Eyes Blue Tears', 'Shania Twain', 1998],
+  ['When You Kiss Me', 'Shania Twain', 2002],
+  ['In My Car', 'Shania Twain', 2002], [`She's Not Just a Pretty Face`, 'Shania Twain', 2002],
+  ['Up!', 'Shania Twain', 2002], [`I'm Gonna Getcha Good!`, 'Shania Twain', 2002],
+  ['Thank You Baby', 'Shania Twain', 2003], ['Forever and for Always', 'Shania Twain', 2002],
+  [`Don't Be Stupid`, 'Shania Twain', 1995], [`If You're Not the One`, 'Shania Twain', 1995],
+  ['The Woman in Me', 'Shania Twain', 1995], ['Leaving Is the Only Way Out', 'Shania Twain', 1995],
+  [`Home Ain't Where His Heart Is`, 'Shania Twain', 1993],
+  ['Dance with the One That Brought You', 'Shania Twain', 1993],
+
 
 ];
 
@@ -647,39 +746,58 @@ function knownYear(title, artist) {
   return KNOWN_YEAR_MAP.get(key) || null;
 }
 
-// ─── MusicBrainz lookup (for songs not in KNOWN_YEARS) ───────────────────────
-const mbCache = new Map();
+// ─── Deezer original song cross-reference ────────────────────────────────────
+// When a song is not in KNOWN_YEARS, we search Deezer for the ORIGINAL
+// recording (no karaoke keywords) and read the album release_date from there.
+// This is the same API we already use — fast, no extra rate limits, no
+// external services.
+//
+// e.g. artist:"Adele" track:"Hello" → returns the original 25 album entry
+// with release_date "2015-11-20" → year 2015 ✓
+//
+// The karaoke track's album.release_date is always wrong (it's the karaoke
+// publisher's upload date). The original song search is accurate.
+const deezerYearCache = new Map();
 
 async function lookupOriginalYear(title, artist) {
   const key = title.toLowerCase() + '||' + artist.toLowerCase();
-  if (mbCache.has(key)) return mbCache.get(key);
+  if (deezerYearCache.has(key)) return deezerYearCache.get(key);
 
-  await new Promise(r => setTimeout(r, 1100)); // respect 1 req/s rate limit
+  // Small delay to avoid hammering Deezer (we already delay in deezerFetch)
+  await new Promise(r => setTimeout(r, 100));
 
   try {
-    const query = `recording:"${title.replace(/"/g, '')}" AND artist:"${artist.replace(/"/g, '')}"`;
-    const url   = 'https://musicbrainz.org/ws/2/recording?query='
-                + encodeURIComponent(query) + '&fmt=json&limit=5';
+    // Search for the original song — no karaoke/instrumental keywords
+    // Use Deezer's field-specific search: artist: and track: operators
+    const q = 'artist:"' + artist.replace(/"/g, '') + '" track:"' + title.replace(/"/g, '') + '"';
+    const url = 'https://api.deezer.com/search?q=' + encodeURIComponent(q) + '&limit=10';
 
-    const res = await fetch(url, {
-      headers: { 'User-Agent': MB_USER_AGENT, 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(12000),
-    });
-    if (!res.ok) { mbCache.set(key, null); return null; }
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) { deezerYearCache.set(key, null); return null; }
 
     const data = await res.json();
+    const tracks = data.data || [];
+
+    // Find the earliest album release date across results
+    // Filter out obvious karaoke results and pick the earliest real release
     let bestYear = null;
-    for (const rec of (data.recordings || [])) {
-      const y = parseInt((rec['first-release-date'] || '').slice(0, 4));
-      if (!isNaN(y) && y >= 1920 && y <= 2030) {
-        if (bestYear === null || y < bestYear) bestYear = y;
+    for (const t of tracks) {
+      // Skip karaoke/instrumental results that snuck through
+      const titleLower = (t.title || '').toLowerCase();
+      if (INSTRUMENTAL_KEYWORDS.some(kw => titleLower.includes(kw))) continue;
+
+      const dateStr = t.album && t.album.release_date ? t.album.release_date : '';
+      const year    = parseInt(dateStr.slice(0, 4));
+      if (!isNaN(year) && year >= 1920 && year <= 2030) {
+        if (bestYear === null || year < bestYear) bestYear = year;
       }
     }
-    mbCache.set(key, bestYear);
+
+    deezerYearCache.set(key, bestYear);
     return bestYear;
   } catch (err) {
-    console.warn('  MB lookup failed [' + title + ']:', err.message);
-    mbCache.set(key, null);
+    console.warn('  Deezer year lookup failed [' + title + ']:', err.message);
+    deezerYearCache.set(key, null);
     return null;
   }
 }
@@ -742,8 +860,10 @@ async function insertTracks(tracks, source) {
     const cleanArtist = realArtist.split(/[,&]/)[0].trim();
 
     // 4. Get original release year
-    //    Step A: check pre-seeded table (instant, no API call)
-    //    Step B: MusicBrainz lookup (1.1s, only if not in table)
+    //    Step A: check KNOWN_YEARS table (instant — 768 hand-curated songs)
+    //    Step B: Deezer cross-reference — search for the original song recording
+    //            to get the real album release_date (not the karaoke upload date).
+    //            Fast (~100ms), same API, in-memory cached per ingest run.
     let originalYear = knownYear(title, cleanArtist);
     if (originalYear === null) {
       originalYear = await lookupOriginalYear(title, cleanArtist);
