@@ -427,7 +427,7 @@
   .pd-item.danger { color: var(--accent2); }
   /* Home nav bar */
   #home-nav {
-    position: absolute; top: 20px; right: 20px; z-index: 10;
+    position: fixed; top: 16px; right: 16px; z-index: 9000;
   }
 
 </style>
@@ -1157,6 +1157,7 @@ let testingMode = false;
 async function initTestingMode(){
   try{
     const res=await fetch('/api/config');
+    if(!res.ok){ testingMode=false; return; }
     const data=await res.json();
     testingMode=data.testing===true;
 
@@ -1169,7 +1170,7 @@ async function initTestingMode(){
         sel.appendChild(opt);
       });
     }
-  } catch(e){ testingMode=false; }
+  } catch(e){ testingMode=false; return; }
 
   if(!testingMode) return;
   document.body.classList.add('testing-mode');
@@ -1396,9 +1397,10 @@ function confirmQuit(){
 })();
 
 window.addEventListener('DOMContentLoaded', () => {
+  // Run each init independently — one failure must not block the others
   renderPlayers();
-  initTestingMode();
-  initAuth();
+  initTestingMode().catch(e => console.warn('initTestingMode failed:', e));
+  initAuth().catch(e => console.warn('initAuth failed:', e));
 });
 
 // ── Auth state ────────────────────────────────────────────────────────────────
