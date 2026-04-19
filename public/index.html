@@ -270,31 +270,45 @@
         <option value="20">20 Rounds</option>
       </select>
     </div>
+
+    <!-- Mode toggle: Genre or Artist — mutually exclusive -->
     <div class="form-group">
-      <label class="form-label">Song Era</label>
-      <select class="form-select" id="era-select">
-        <option value="all">All Eras</option>
-        <option value="60s70s">60s & 70s</option>
-        <option value="80s90s">80s & 90s</option>
-        <option value="2000s">2000s</option>
-        <option value="modern">Modern (2010+)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Genre</label>
-      <select class="form-select" id="genre-select">
-        <option value="all">All Genres</option>
-        <option value="pop">Pop</option>
-        <option value="rock">Rock</option>
-        <option value="hip-hop">Hip-Hop</option>
-        <option value="90s-rap">90s Rap</option>
-        <option value="rnb">R&amp;B / Soul</option>
-        <option value="country">Country</option>
-        <option value="dance">Dance / Electronic</option>
-        <option value="classic-rock">Classic Rock</option>
-        <option value="soul">Soul / Motown</option>
-        <option value="soundtracks">Movie Soundtracks</option>
-      </select>
+      <label class="form-label" style="margin-bottom:12px;">Play Mode</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="form-label" style="margin-bottom:6px;">🎸 By Genre</label>
+          <select class="form-select" id="era-select" onchange="onEraOrGenreChange()">
+            <option value="all">All Eras</option>
+            <option value="60s70s">60s & 70s</option>
+            <option value="80s90s">80s & 90s</option>
+            <option value="2000s">2000s</option>
+            <option value="modern">Modern (2010+)</option>
+          </select>
+          <select class="form-select" id="genre-select" style="margin-top:8px;" onchange="onEraOrGenreChange()">
+            <option value="all">All Genres</option>
+            <option value="pop">Pop</option>
+            <option value="rock">Rock</option>
+            <option value="hip-hop">Hip-Hop</option>
+            <option value="90s-rap">90s Rap</option>
+            <option value="rnb">R&amp;B / Soul</option>
+            <option value="country">Country</option>
+            <option value="dance">Dance / Electronic</option>
+            <option value="classic-rock">Classic Rock</option>
+            <option value="soul">Soul / Motown</option>
+            <option value="soundtracks">Movie Soundtracks</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="margin-bottom:6px;">🎤 By Artist</label>
+          <select class="form-select" id="artist-select" onchange="onArtistChange()">
+            <option value="all">— Select Artist —</option>
+            <!-- populated dynamically from /api/config -->
+          </select>
+          <div id="artist-mode-hint" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(232,255,71,0.07);border:1px solid rgba(232,255,71,0.2);font-size:12px;color:var(--accent);line-height:1.5;">
+            🎵 Artist mode: guess the <strong>song title</strong> and <strong>release year</strong>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
   <button class="btn btn-primary w-full" style="max-width:540px;" onclick="startGame()">Start Game →</button>
@@ -367,8 +381,9 @@
     </div>
     <div class="status-row" id="status-row"></div>
     <div id="reveal-area" style="display:none;"></div>
-    <!-- Guess inputs: Artist LEFT, Song Title RIGHT -->
-    <div class="guess-section" id="guess-section">
+
+    <!-- GENRE MODE: Artist (left) + Song Title (right) -->
+    <div class="guess-section" id="guess-genre">
       <div class="guess-grid">
         <div>
           <span class="guess-label">🎤 Artist Name</span>
@@ -384,8 +399,31 @@
         </div>
       </div>
       <div class="guess-actions">
-        <button class="btn btn-primary"   id="submit-btn" onclick="submitGuess()">Submit Guess</button>
-        <button class="btn btn-secondary" id="skip-btn"   onclick="skipRound()">Skip</button>
+        <button class="btn btn-primary"   id="submit-btn-genre" onclick="submitGuess()">Submit Guess</button>
+        <button class="btn btn-secondary" id="skip-btn-genre"   onclick="skipRound()">Skip</button>
+      </div>
+    </div>
+
+    <!-- ARTIST MODE: Song Title (left) + Release Year (right) -->
+    <div class="guess-section" id="guess-artist-mode" style="display:none;">
+      <div id="artist-mode-banner" style="text-align:center;padding:6px 0 2px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:600;"></div>
+      <div class="guess-grid">
+        <div>
+          <span class="guess-label">🎵 Song Title</span>
+          <div class="guess-wrap">
+            <input class="guess-field" id="guess-song-am" type="text" placeholder="What's this song?" autocomplete="off" autocorrect="off" spellcheck="false">
+          </div>
+        </div>
+        <div>
+          <span class="guess-label">📅 Release Year</span>
+          <div class="guess-wrap">
+            <input class="guess-field" id="guess-year" type="number" min="1950" max="2030" placeholder="e.g. 1999" autocomplete="off">
+          </div>
+        </div>
+      </div>
+      <div class="guess-actions">
+        <button class="btn btn-primary"   id="submit-btn-am" onclick="submitGuess()">Submit Guess</button>
+        <button class="btn btn-secondary" id="skip-btn-am"   onclick="skipRound()">Skip</button>
       </div>
     </div>
     <div id="next-area" style="display:none;text-align:center;">
@@ -418,8 +456,15 @@
 const G = {
   players:[], scores:{}, currentPlayerIdx:0,
   round:1, totalRounds:10, songs:[], currentSongIdx:0,
+  // Genre mode tracked fields
   songGuessed:false, artistGuessed:false,
+  // Artist mode tracked fields
+  titleGuessed:false, yearGuessed:false,
   timerInterval:null, timeLeft:15, roundStartTime:null, active:false,
+  // 'genre' | 'artist'
+  mode: 'genre',
+  // The locked artist name when in artist mode
+  lockedArtist: null,
 };
 
 let audio = null;
@@ -460,35 +505,61 @@ function removePlayer(idx){
   vals.forEach((v,i)=>{const e=document.getElementById(`pn${i}`);if(e)e.value=v;});
 }
 
-// ── Start game: fetch songs from DB ──────────────────────────────────────────
+// ── Dropdown mutual exclusion ─────────────────────────────────────────────────
+function onEraOrGenreChange(){
+  const era=document.getElementById('era-select').value;
+  const genre=document.getElementById('genre-select').value;
+  if(era!=='all'||genre!=='all'){
+    document.getElementById('artist-select').value='all';
+    document.getElementById('artist-mode-hint').style.display='none';
+  }
+}
+function onArtistChange(){
+  const artist=document.getElementById('artist-select').value;
+  if(artist!=='all'){
+    document.getElementById('era-select').value='all';
+    document.getElementById('genre-select').value='all';
+    document.getElementById('artist-mode-hint').style.display='block';
+  } else {
+    document.getElementById('artist-mode-hint').style.display='none';
+  }
+}
+
+// ── Start game ────────────────────────────────────────────────────────────────
 async function startGame(){
   const players=Array.from({length:playerCount},(_,i)=>document.getElementById(`pn${i}`)?.value.trim()||DN[i]);
   const rounds=parseInt(document.getElementById('rounds-select').value);
   const era=document.getElementById('era-select').value;
   const genre=document.getElementById('genre-select').value;
+  const artist=document.getElementById('artist-select').value;
+  const isArtistMode=artist!=='all';
 
-  // Show loading screen
   showScreen('loading');
-  setLoadUI('Setting the Stage', 'Picking songs from the catalog…', 10);
+  setLoadUI(isArtistMode?`${artist} — Artist Mode`:'Setting the Stage','Picking songs from the catalog…',10);
 
   let songs;
   try{
-    const res=await fetch(`/api/songs?era=${encodeURIComponent(era)}&genre=${encodeURIComponent(genre)}&count=${rounds}`);
+    let url=`/api/songs?count=${rounds}`;
+    if(isArtistMode) url+=`&artist=${encodeURIComponent(artist)}`;
+    else url+=`&era=${encodeURIComponent(era)}&genre=${encodeURIComponent(genre)}`;
+    const res=await fetch(url);
     if(!res.ok) throw new Error('Server error');
     const data=await res.json();
     songs=data.songs;
-    if(!songs?.length) throw new Error('No songs');
+    if(!songs?.length) throw new Error('No songs returned');
   } catch(err){
-    showToast('Could not load songs — is the server running?','error');
+    showToast('Could not load songs — check your connection','error');
     showScreen('setup'); return;
   }
 
-  setLoadUI('Ready!', `${songs.length} songs loaded`, 100);
-  await new Promise(r=>setTimeout(r,600)); // brief "Ready!" moment
+  setLoadUI('Ready!',`${songs.length} songs loaded`,100);
+  await new Promise(r=>setTimeout(r,500));
 
   G.players=players; G.scores=Object.fromEntries(players.map(p=>[p,0]));
   G.round=1; G.totalRounds=rounds; G.songs=songs;
   G.currentSongIdx=0; G.currentPlayerIdx=0;
+  G.mode=isArtistMode?'artist':'genre';
+  G.lockedArtist=isArtistMode?artist:null;
   showScreen('game'); beginRound();
 }
 
@@ -501,10 +572,13 @@ function setLoadUI(title, sub, pct){
 
 async function replayGame(){
   showScreen('loading');
-  setLoadUI('Shuffling…', 'Getting a fresh set of songs…', 20);
+  setLoadUI('Shuffling…','Getting a fresh set of songs…',20);
   let songs;
   try{
-    const res=await fetch(`/api/songs?era=all&count=${G.totalRounds}`);
+    let url=`/api/songs?count=${G.totalRounds}`;
+    if(G.mode==='artist'&&G.lockedArtist) url+=`&artist=${encodeURIComponent(G.lockedArtist)}`;
+    else url+='&era=all';
+    const res=await fetch(url);
     const data=await res.json();
     songs=data.songs||G.songs;
   } catch{ songs=G.songs; }
@@ -518,7 +592,9 @@ async function replayGame(){
 // ── Round ────────────────────────────────────────────────────────────────────
 async function beginRound(){
   const song=G.songs[G.currentSongIdx];
-  G.songGuessed=false; G.artistGuessed=false; G.active=false; G.timeLeft=15;
+  G.songGuessed=false; G.artistGuessed=false;
+  G.titleGuessed=false; G.yearGuessed=false;
+  G.active=false; G.timeLeft=15;
   document.getElementById('h-round').textContent=G.round;
   document.getElementById('h-total').textContent=G.totalRounds;
   document.getElementById('cp-area').innerHTML=G.players.length>1
@@ -526,7 +602,12 @@ async function beginRound(){
   resetGuessInputs();
   document.getElementById('reveal-area').style.display='none';
   document.getElementById('next-area').style.display='none';
-  document.getElementById('guess-section').style.display='flex';
+  // Show the right guess panel for current mode
+  document.getElementById('guess-genre').style.display    = G.mode==='genre' ? 'flex' : 'none';
+  document.getElementById('guess-artist-mode').style.display = G.mode==='artist' ? 'flex' : 'none';
+  if(G.mode==='artist'&&G.lockedArtist){
+    document.getElementById('artist-mode-banner').textContent=`🎤 ${G.lockedArtist}`;
+  }
   setTimerUI(15,15); setVinyl('loading'); setStatus('load','⏳ Loading instrumental…');
   updateScoreboard();
 
@@ -574,17 +655,30 @@ function skipRound(){if(!G.active)return;G.active=false;clearInterval(G.timerInt
 function endRound(){
   const song=G.songs[G.currentSongIdx];
   disableGuess(true);
-  setVinyl(G.songGuessed||G.artistGuessed?'success':'idle');
+
+  const anyCorrect = G.mode==='artist'
+    ? (G.titleGuessed||G.yearGuessed)
+    : (G.songGuessed||G.artistGuessed);
+  setVinyl(anyCorrect?'success':'idle');
   setStatus('','');
+
   let b='';
-  if(G.artistGuessed) b+=`<div class="rb rb-artist">🎤 Artist Correct</div>`;
-  if(G.songGuessed)   b+=`<div class="rb rb-song">🎵 Song Correct</div>`;
-  if(!G.songGuessed&&!G.artistGuessed) b+=`<div class="rb rb-none">No points this round</div>`;
+  if(G.mode==='artist'){
+    if(G.titleGuessed) b+=`<div class="rb rb-song">🎵 Title Correct</div>`;
+    if(G.yearGuessed)  b+=`<div class="rb rb-artist">📅 Year Correct</div>`;
+    if(!G.titleGuessed&&!G.yearGuessed) b+=`<div class="rb rb-none">No points this round</div>`;
+  } else {
+    if(G.artistGuessed) b+=`<div class="rb rb-artist">🎤 Artist Correct</div>`;
+    if(G.songGuessed)   b+=`<div class="rb rb-song">🎵 Song Correct</div>`;
+    if(!G.songGuessed&&!G.artistGuessed) b+=`<div class="rb rb-none">No points this round</div>`;
+  }
+
+  const yearStr = song.decade ? ` (${song.decade})` : '';
   document.getElementById('reveal-area').style.display='block';
   document.getElementById('reveal-area').innerHTML=`
     <div class="reveal-card">
       <div class="reveal-eyebrow">The answer was</div>
-      <div class="reveal-title">${song.title}</div>
+      <div class="reveal-title">${song.title}${yearStr}</div>
       <div class="reveal-artist">by ${song.artist}</div>
       <div class="reveal-badges">${b}</div>
     </div>`;
@@ -684,22 +778,53 @@ function isMatch(guess, target){
   return false;
 }
 
-// Build the full list of acceptable targets for an artist string.
-// Handles featured artists, "The X" → "X", etc.
-function artistVariants(artist){
-  const variants = [artist];
-  // Split on featuring markers — "Drake ft. Future" → also accept "Drake"
-  const primary = artist.split(/\bfeat(uring)?\b|\bft\b|\bwith\b|\band\b|[&,]/i)[0].trim();
-  if(primary && primary !== artist) variants.push(primary);
-  // "The Beatles" → "Beatles"
-  const noThe = artist.replace(/^the\s+/i,'').trim();
-  if(noThe !== artist) variants.push(noThe);
-  return variants;
+// Build all acceptable artist targets for a song.
+// Handles: publisher names in artist field (fallback via deezer_query),
+// featured artists, "The X" variants, common aliases.
+function artistTargets(song) {
+  const targets = [];
+
+  // Primary: whatever is in the artist column
+  if (song.artist) targets.push(song.artist);
+
+  // Fallback: extract artist from deezer_query if it's there
+  // deezer_query looks like: '"24K Magic" "Bruno Mars" instrumental karaoke'
+  // so we pull out quoted tokens
+  if (song.deezer_query) {
+    const quoted = song.deezer_query.match(/"([^"]+)"/g) || [];
+    for (const q of quoted) {
+      const val = q.replace(/"/g, '').trim();
+      // Skip if it looks like a song title (matches the actual title) or a keyword
+      const lower = val.toLowerCase();
+      if (lower === 'instrumental' || lower === 'karaoke' || lower === 'backing track') continue;
+      if (song.title && norm(val) === norm(song.title)) continue;
+      if (val.length > 1) targets.push(val);
+    }
+  }
+
+  // For each target, also add:
+  //   - primary artist before "feat." / "&" / ","
+  //   - "Beatles" from "The Beatles"
+  const expanded = [];
+  for (const t of targets) {
+    expanded.push(t);
+    const primary = t.split(/\bfeat(uring)?\b|\bft\.?\b|\bwith\b|[&,]/i)[0].trim();
+    if (primary && primary !== t) expanded.push(primary);
+    const noThe = t.replace(/^the\s+/i, '').trim();
+    if (noThe !== t) expanded.push(noThe);
+  }
+
+  // Deduplicate
+  return [...new Set(expanded)];
 }
 
-// Check if a guess matches an artist (tries all variants)
-function matchesArtist(guess, artist){
-  return artistVariants(artist).some(v => isMatch(guess, v));
+// Check if a guess matches any valid artist target for this song
+function matchesArtist(guess, song) {
+  // song can be passed as just a string (backward compat) or as the full object
+  if (typeof song === 'string') {
+    return artistTargets({ artist: song }).some(t => isMatch(guess, t));
+  }
+  return artistTargets(song).some(t => isMatch(guess, t));
 }
 
 // Check if a guess matches a song title
@@ -709,36 +834,125 @@ function matchesTitle(guess, title){
 
 function pts(e,t){return e<=5?(t==='song'?500:300):e<=10?(t==='song'?350:200):(t==='song'?150:100);}
 
+// Year guessing — same bracket timing as other guesses, with accuracy tolerance:
+//   Exact year         → full points for the timing bracket
+//   ±1 year off        → 60% of full points
+//   ±2 years off       → 25% of full points
+//   More than 2 off    → 0 points
+// If song.decade (release year) is unknown, any year earns 0.
+function yearPoints(guessedYear, actualYear, elapsed){
+  if(!actualYear||isNaN(guessedYear)) return 0;
+  const diff = Math.abs(guessedYear - actualYear);
+  const base = pts(elapsed, 'artist'); // same bracket as artist guess
+  if(diff === 0) return base;
+  if(diff === 1) return Math.round(base * 0.6);
+  if(diff === 2) return Math.round(base * 0.25);
+  return 0;
+}
+
 function submitGuess(){
   if(!G.active)return;
   const song=G.songs[G.currentSongIdx];
   const elapsed=(Date.now()-G.roundStartTime)/1000;
-  const ag=document.getElementById('guess-artist').value;
-  const sg=document.getElementById('guess-song').value;
   const player=G.players[G.currentPlayerIdx];
-  if(!ag.trim()&&!sg.trim()){showToast('Type a guess!','error');return;}
   let delta=0;
-  if(!G.artistGuessed&&ag.trim()){
-    if(matchesArtist(ag,song.artist)){
-      G.artistGuessed=true;const p=pts(elapsed,'artist');G.scores[player]+=p;delta+=p;
-      markInput('guess-artist','correct');showToast(`🎤 Artist! +${p} pts`,'success');
-    }else{markInput('guess-artist','wrong');}
-  }
-  if(!G.songGuessed&&sg.trim()){
-    if(matchesTitle(sg,song.title)){
-      G.songGuessed=true;const p=pts(elapsed,'song');G.scores[player]+=p;delta+=p;
-      markInput('guess-song','correct');showToast(`🎵 Song! +${p} pts`,'success');
-    }else{markInput('guess-song','wrong');}
-  }
-  if(delta)updateScoreboard(player,delta);
-  if(G.songGuessed&&G.artistGuessed){
-    G.active=false;clearInterval(G.timerInterval);stopAudio();setTimeout(endRound,450);
+
+  if(G.mode==='artist'){
+    // ── Artist mode: Song Title + Release Year ──────────────────────────────
+    const sg=document.getElementById('guess-song-am').value;
+    const yg=document.getElementById('guess-year').value;
+    if(!sg.trim()&&!yg.trim()){showToast('Type a guess!','error');return;}
+
+    if(!G.titleGuessed&&sg.trim()){
+      if(matchesTitle(sg,song.title)){
+        G.titleGuessed=true;const p=pts(elapsed,'song');G.scores[player]+=p;delta+=p;
+        markInput('guess-song-am','correct');showToast(`🎵 Title! +${p} pts`,'success');
+      }else{markInput('guess-song-am','wrong');}
+    }
+    if(!G.yearGuessed&&yg.trim()){
+      const yp=yearPoints(parseInt(yg),song.decade,elapsed);
+      if(yp>0){
+        G.yearGuessed=true;G.scores[player]+=yp;delta+=yp;
+        markInput('guess-year','correct');showToast(`📅 Year! +${yp} pts`,'success');
+      }else{markInput('guess-year','wrong');}
+    }
+    if(delta)updateScoreboard(player,delta);
+    if(G.titleGuessed&&G.yearGuessed){
+      G.active=false;clearInterval(G.timerInterval);stopAudio();setTimeout(endRound,450);
+    }
+
+  } else {
+    // ── Genre mode: Artist + Song Title ────────────────────────────────────
+    const ag=document.getElementById('guess-artist').value;
+    const sg=document.getElementById('guess-song').value;
+    if(!ag.trim()&&!sg.trim()){showToast('Type a guess!','error');return;}
+
+    if(!G.artistGuessed&&ag.trim()){
+      if(matchesArtist(ag,song)){
+        G.artistGuessed=true;const p=pts(elapsed,'artist');G.scores[player]+=p;delta+=p;
+        markInput('guess-artist','correct');showToast(`🎤 Artist! +${p} pts`,'success');
+      }else{markInput('guess-artist','wrong');}
+    }
+    if(!G.songGuessed&&sg.trim()){
+      if(matchesTitle(sg,song.title)){
+        G.songGuessed=true;const p=pts(elapsed,'song');G.scores[player]+=p;delta+=p;
+        markInput('guess-song','correct');showToast(`🎵 Song! +${p} pts`,'success');
+      }else{markInput('guess-song','wrong');}
+    }
+    if(delta)updateScoreboard(player,delta);
+    if(G.songGuessed&&G.artistGuessed){
+      G.active=false;clearInterval(G.timerInterval);stopAudio();setTimeout(endRound,450);
+    }
   }
 }
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&document.getElementById('screen-game').classList.contains('active'))submitGuess();
 });
+
+// ── Testing mode + artist dropdown init ───────────────────────────────────────
+let testingMode = false;
+
+async function initTestingMode(){
+  try{
+    const res=await fetch('/api/config');
+    const data=await res.json();
+    testingMode=data.testing===true;
+
+    // Populate artist dropdown from config
+    if(data.artists&&data.artists.length){
+      const sel=document.getElementById('artist-select');
+      data.artists.forEach(a=>{
+        const opt=document.createElement('option');
+        opt.value=a; opt.textContent=a;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e){ testingMode=false; }
+
+  if(!testingMode) return;
+  document.body.classList.add('testing-mode');
+  document.getElementById('testing-banner').classList.add('visible');
+  document.getElementById('testing-banner').addEventListener('click',()=>{
+    if(confirm('Reset the song database now? This will wipe all songs and re-seed from Deezer.')){
+      resetDatabase();
+    }
+  });
+  const btn=document.getElementById('reset-btn');
+  if(btn) btn.style.display='';
+}
+
+async function resetDatabase(){
+  if(!testingMode) return;
+  showToast('Resetting database…','info');
+  try{
+    const res=await fetch('/api/admin/reset');
+    const data=await res.json();
+    showToast(data.message||'Reset triggered','success');
+  } catch(e){
+    showToast('Reset failed — check server logs','error');
+  }
+}
 
 // ── UI ────────────────────────────────────────────────────────────────────────
 function setVinyl(state){
@@ -764,14 +978,18 @@ function markInput(id,state){
   else setTimeout(()=>el.className='guess-field',420);
 }
 function resetGuessInputs(){
-  ['guess-artist','guess-song'].forEach(id=>{
-    const el=document.getElementById(id);el.value='';el.className='guess-field';el.disabled=false;
+  ['guess-artist','guess-song','guess-song-am','guess-year'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.value='';el.className='guess-field';el.disabled=false;}
   });
   disableGuess(false);
 }
 function disableGuess(yes){
-  document.getElementById('submit-btn').disabled=yes;
-  document.getElementById('skip-btn').disabled=yes;
+  // Disable all submit/skip buttons in both modes
+  ['submit-btn-genre','skip-btn-genre','submit-btn-am','skip-btn-am'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.disabled=yes;
+  });
 }
 function updateScoreboard(hl=null,delta=0){
   const sorted=[...G.players].sort((a,b)=>G.scores[b]-G.scores[a]);
@@ -836,46 +1054,6 @@ window.addEventListener('DOMContentLoaded', () => {
   renderPlayers();
   initTestingMode();
 });
-
-// ── Testing mode ──────────────────────────────────────────────────────────────
-let testingMode = false;
-
-async function initTestingMode() {
-  try {
-    const res  = await fetch('/api/config');
-    const data = await res.json();
-    testingMode = data.testing === true;
-  } catch (e) {
-    testingMode = false;
-  }
-
-  if (!testingMode) return;
-
-  // Show the warning banner
-  document.body.classList.add('testing-mode');
-  document.getElementById('testing-banner').classList.add('visible');
-  document.getElementById('testing-banner').addEventListener('click', () => {
-    if (confirm('Reset the song database now? This will wipe all songs and re-seed from Deezer.')) {
-      resetDatabase();
-    }
-  });
-
-  // Show the reset button on the results screen
-  const btn = document.getElementById('reset-btn');
-  if (btn) btn.style.display = '';
-}
-
-async function resetDatabase() {
-  if (!testingMode) return;
-  showToast('Resetting database…', 'info');
-  try {
-    const res  = await fetch('/api/admin/reset');
-    const data = await res.json();
-    showToast(data.message || 'Reset triggered', 'success');
-  } catch (e) {
-    showToast('Reset failed — check server logs', 'error');
-  }
-}
 </script>
 </body>
 </html>
