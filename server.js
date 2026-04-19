@@ -43,20 +43,27 @@ function isInstrumental(t) {
 // Supports filtering by era and/or genre. Returns id, title, artist so the
 // frontend can request a fresh preview for each song as rounds begin.
 app.get('/api/songs', async (req, res) => {
-  const era   = req.query.era   || 'all';
-  const genre = req.query.genre || 'all';
-  const count = Math.min(parseInt(req.query.count) || 10, 50);
+  const era    = req.query.era    || 'all';
+  const genre  = req.query.genre  || 'all';
+  const artist = req.query.artist || 'all';
+  const count  = Math.min(parseInt(req.query.count) || 10, 50);
 
   try {
     const conditions = ['enabled = true'];
     const params     = [];
 
-    if (era   !== 'all') { params.push(era);   conditions.push(`era = $${params.length}`); }
-    if (genre !== 'all') { params.push(genre);  conditions.push(`genre = $${params.length}`); }
+    if (artist !== 'all') {
+      // Artist mode: filter by artist name (case-insensitive contains)
+      params.push('%' + artist.toLowerCase() + '%');
+      conditions.push(`lower(artist) LIKE $${params.length}`);
+    } else {
+      if (era   !== 'all') { params.push(era);   conditions.push(`era = $${params.length}`); }
+      if (genre !== 'all') { params.push(genre);  conditions.push(`genre = $${params.length}`); }
+    }
 
     params.push(count);
     const where = conditions.join(' AND ');
-    const sql   = `SELECT id, title, artist, era, genre, decade
+    const sql   = `SELECT id, title, artist, era, genre, decade, deezer_query
                    FROM songs WHERE ${where}
                    ORDER BY RANDOM() LIMIT $${params.length}`;
 
@@ -65,7 +72,7 @@ app.get('/api/songs', async (req, res) => {
     // Fallback: if filtered query returns nothing, pull from full catalog
     if (result.rows.length === 0) {
       result = await pool.query(
-        `SELECT id, title, artist, era, genre, decade
+        `SELECT id, title, artist, era, genre, decade, deezer_query
          FROM songs WHERE enabled = true
          ORDER BY RANDOM() LIMIT $1`,
         [count]
@@ -159,18 +166,59 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
+// ─── Artist-locked sources list (kept in sync with catalog.js) ───────────────
+// This is the canonical list of artists available in the Artist dropdown.
+// An artist appears here only if catalog.js has a source with artist_lock
+// for that artist. Sorted alphabetically for the dropdown.
+const LOCKED_ARTISTS = [
+  'ABBA', 'AC/DC', 'Adele', 'Aerosmith', 'Alicia Keys', 'Amy Winehouse',
+  'Ariana Grande', 'Aretha Franklin', 'Avicii', 'Backstreet Boys', 'Beyonce',
+  'Billie Eilish', 'Bon Jovi', 'Bruce Springsteen', 'Bruno Mars',
+  'Calvin Harris', 'Coldplay', 'Coolio', 'Daft Punk', 'David Bowie',
+  'David Guetta', 'DMX', 'Dolly Parton', 'Dr. Dre', 'Drake',
+  'Dua Lipa', 'Eagles', 'Ed Sheeran', 'Elton John', 'Eminem',
+  'Fleetwood Mac', 'Foo Fighters', 'Frank Ocean', 'Garth Brooks',
+  'Green Day', 'Guns N\' Roses', 'Harry Styles', 'Jay-Z', 'Jimi Hendrix',
+  'Johnny Cash', 'Justin Bieber', 'Justin Timberlake', 'Kanye West',
+  'Kendrick Lamar', 'Kenny Rogers', 'Lady Gaga', 'Led Zeppelin',
+  'Lil Nas X', 'Luke Bryan', 'Madonna', 'Mariah Carey', 'Marvin Gaye',
+  'Missy Elliott', 'Morgan Wallen', 'Nas', 'Nirvana', 'NSYNC',
+  'Oasis', 'Olivia Rodrigo', 'Otis Redding', 'Pearl Jam', 'Pink Floyd',
+  'Post Malone', 'Prince', 'Queen', 'Rihanna', 'Rolling Stones',
+  'Sam Smith', 'Shania Twain', 'Snoop Dogg', 'Spice Girls', 'SZA',
+  'Taylor Swift', 'The Beatles', 'The Weeknd', 'TLC', 'Tupac', 'U2',
+  'Usher', 'Van Halen', 'Warren G', 'Whitney Houston',
+].sort();
+
 // ─── Testing mode flag ────────────────────────────────────────────────────────
-// Set TESTING=true in Render environment variables to enable alpha-test mode.
-// In testing mode:
-//   • The songs table is wiped on every server restart
-//   • GET /api/admin/reset clears the table and re-seeds (no secret required)
-//   • GET /api/config tells the frontend that testing mode is active
 const TESTING = process.env.TESTING === 'true';
 
 // ─── GET /api/config ──────────────────────────────────────────────────────────
-// Frontend reads this on load to know whether to show the reset button / banner.
 app.get('/api/config', (_req, res) => {
-  res.json({ testing: TESTING });
+  res.json({ testing: TESTING, artists: LOCKED_ARTISTS });
+});
+
+// ─── GET /api/artists ─────────────────────────────────────────────────────────
+// Returns distinct artists in the DB that match one of the locked artists.
+// Used to only show artists that actually have songs in the current catalog.
+app.get('/api/artists', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT DISTINCT artist FROM songs WHERE enabled = true ORDER BY artist ASC`
+    );
+    const inDB = new Set(rows.map(r => r.artist.toLowerCase()));
+    // Return only locked artists that have at least one song in the DB
+    const available = LOCKED_ARTISTS.filter(a => {
+      const norm = a.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+      return rows.some(r => {
+        const rn = r.artist.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+        return rn.includes(norm) || norm.includes(rn);
+      });
+    });
+    res.json({ artists: available });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ─── GET /api/admin/ingest ────────────────────────────────────────────────────

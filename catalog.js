@@ -1,13 +1,17 @@
 /**
- * catalog.js — Deezer ingestion engine v3
+ * catalog.js — Deezer ingestion engine v4  (Strict Mode)
  *
- * Changes from v2:
- *  - Added `genre` column (e.g. "pop", "rock", "hip-hop", "90s-rap", "soundtracks")
- *  - Mashup/compilation/medley rejection at ingestion time
- *  - preview_cache column REMOVED from insert — we never store preview URLs
- *    because Deezer CDN tokens expire in ~30 minutes
- *  - Tighter search sources organised by genre + era
- *  - Duration filter: reject tracks under 60s (intros/snippets) or over 600s (albums)
+ * Core guarantees:
+ *  1. `artist` column always contains the REAL original artist, never a
+ *     karaoke publisher. If we cannot extract the real artist, the track
+ *     is REJECTED.
+ *  2. Every source has an explicit decade_min / decade_max window.
+ *     Tracks whose release year falls outside that window are REJECTED —
+ *     no "2000s R&B" track can sneak into the 90s bucket.
+ *  3. Sources with artist_lock only accept tracks attributed to that exact
+ *     artist. A Shania Twain source will never insert an Ed Sheeran track.
+ *  4. Mashups, medleys, compilations and multi-song tracks are rejected.
+ *  5. Instrumental filter: title or title_version must confirm vocal-free.
  */
 
 const pool = require('./db');
@@ -26,33 +30,17 @@ function isInstrumental(track) {
 }
 
 // ─── Mashup / compilation rejection ──────────────────────────────────────────
-// These title patterns indicate medleys, megamixes, or multi-song compilations
-// where players cannot reliably identify a single song.
-const REJECT_TITLE_PATTERNS = [
-  /\bmedley\b/i,
-  /\bmegamix\b/i,
-  /\bmashup\b/i,
-  /\bmash.?up\b/i,
-  /\bremix\s+medley\b/i,
-  /\bcollection\b/i,
-  /\bcompilation\b/i,
-  /\bgreatest hits\b/i,  // avoid generic "greatest hits" tracks
-  /\bbest of\b/i,
-  /\btribute to (various|multiple|many)\b/i,
-  /\d+\s+(hits|songs|classics)\s+in\s+\d+/i,  // "20 hits in 10 minutes"
-  /hits?\s+of\s+the\s+\d{4}s?\b/i,            // "Hits of the 80s" compilation tracks
-  /\bnon.?stop\b/i,                            // "Non-Stop Party Mix"
-  /\bparty\s+mix\b/i,
-  /\bkaraoke\s+megamix\b/i,
+const REJECT_PATTERNS = [
+  /\bmedley\b/i, /\bmegamix\b/i, /\bmashup\b/i, /\bmash.?up\b/i,
+  /\bcollection\b/i, /\bcompilation\b/i,
+  /\d+\s+(hits|songs|classics)\s+in\s+\d+/i,
+  /\bnon.?stop\b/i, /\bparty\s+mix\b/i, /\bkaraoke\s+megamix\b/i,
 ];
-
 function isRejectedTitle(title) {
-  return REJECT_TITLE_PATTERNS.some(p => p.test(title));
+  return REJECT_PATTERNS.some(p => p.test(title));
 }
 
 // ─── Duration filter ──────────────────────────────────────────────────────────
-// Deezer previews are 30 seconds regardless, but the full track duration
-// signals whether this is a real song (60s-600s) or a snippet/album run-on.
 function hasSensibleDuration(track) {
   const d = track.duration || 0;
   return d >= 60 && d <= 600;
@@ -95,48 +83,228 @@ function extractRealTitle(track) {
 }
 
 // ─── Artist extraction ────────────────────────────────────────────────────────
+// Priority order — first match wins.
 const ARTIST_PATTERNS = [
-  /originally performed by\s+([^)([\]\n,]+)/i,
-  /originally recorded by\s+([^)([\]\n,]+)/i,
-  /originally popularized by\s+([^)([\]\n,]+)/i,
-  /originally by\s+([^)([\]\n,]+)/i,
-  /made famous by\s+([^)([\]\n,]+)/i,
-  /as made famous by\s+([^)([\]\n,]+)/i,
-  /as performed by\s+([^)([\]\n,]+)/i,
-  /in the style of\s+([^)([\]\n,]+)/i,
-  /tribute to\s+([^)([\]\n,]+)/i,
+  /originally performed by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /originally recorded by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /originally popularized by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /originally by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /made famous by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /as made famous by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /as performed by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /in the style of\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /tribute to\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /\[([^\]]+?)\s+karaoke]/i,
   /\(([^)]+?)\s+karaoke\)/i,
 ];
+
 function extractOriginalArtist(track) {
-  const title = track.title || '';
+  // Try the full title first (has the most publisher metadata)
+  const fullTitle = track.title || '';
   for (const pattern of ARTIST_PATTERNS) {
-    const m = title.match(pattern);
+    const m = fullTitle.match(pattern);
     if (m) {
       const artist = m[1]
-        .replace(/\s*[-\u2013]\s*(karaoke|instrumental|version|track).*/i, '')
+        .replace(/\s*[-\u2013]\s*(karaoke|instrumental|version|track|vocal).*/i, '')
         .replace(/\s*\(.*\)$/, '')
         .trim();
-      if (artist.length > 1) return artist;
+      if (artist.length > 1 && artist.length < 60) return artist;
     }
   }
   return null;
 }
 
-// ─── Era classifier ───────────────────────────────────────────────────────────
-function inferEra(track, defaultEra) {
-  const year = track.album && track.album.release_date
-    ? parseInt(track.album.release_date.slice(0, 4)) : null;
-  if (!year) return defaultEra;
+// ─── Release year extraction ──────────────────────────────────────────────────
+function releaseYear(track) {
+  const d = track.album && track.album.release_date;
+  if (!d) return null;
+  const y = parseInt(d.slice(0, 4));
+  return isNaN(y) ? null : y;
+}
+
+// ─── Era from year ────────────────────────────────────────────────────────────
+function eraFromYear(year) {
+  if (!year) return 'modern';
   if (year < 1980) return '60s70s';
   if (year < 2000) return '80s90s';
   if (year < 2010) return '2000s';
   return 'modern';
 }
 
+// ─── Artist normaliser (for artist_lock comparison) ───────────────────────────
+function normArtist(s) {
+  return (s || '').toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\bthe\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ─── Sources ──────────────────────────────────────────────────────────────────
+// Each source must declare:
+//   query        — Deezer search string
+//   genre        — DB genre tag
+//   era          — DB era tag (must align with decade_min/decade_max)
+//   decade_min   — inclusive lower bound (release year)
+//   decade_max   — inclusive upper bound (release year)
+//   label        — human-readable for logs
+//
+// Optional:
+//   artist_lock  — if set, extracted artist MUST fuzzy-match this string
+//                  (used for single-artist genre categories)
+
+const SOURCES = [
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // POP
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Karaoke Hits pop 2010s',          genre:'pop',         era:'modern',  decade_min:2010, decade_max:2029, label:'Pop 2010s'           },
+  { query: 'Karaoke Hits pop 2020s',          genre:'pop',         era:'modern',  decade_min:2020, decade_max:2029, label:'Pop 2020s'           },
+  { query: 'Karaoke Hits pop 2000s',          genre:'pop',         era:'2000s',   decade_min:2000, decade_max:2009, label:'Pop 2000s'           },
+  { query: 'Karaoke Hits pop 90s',            genre:'pop',         era:'80s90s',  decade_min:1990, decade_max:1999, label:'Pop 90s'             },
+  { query: 'Karaoke Hits pop 80s',            genre:'pop',         era:'80s90s',  decade_min:1980, decade_max:1989, label:'Pop 80s'             },
+  { query: 'Taylor Swift karaoke instrumental', genre:'pop',       era:'modern',  decade_min:2006, decade_max:2029, label:'Taylor Swift',        artist_lock:'Taylor Swift'    },
+  { query: 'Adele karaoke instrumental',      genre:'pop',         era:'modern',  decade_min:2008, decade_max:2029, label:'Adele',               artist_lock:'Adele'           },
+  { query: 'Ed Sheeran karaoke',              genre:'pop',         era:'modern',  decade_min:2011, decade_max:2029, label:'Ed Sheeran',          artist_lock:'Ed Sheeran'      },
+  { query: 'Bruno Mars karaoke',              genre:'pop',         era:'modern',  decade_min:2010, decade_max:2029, label:'Bruno Mars',          artist_lock:'Bruno Mars'      },
+  { query: 'Billie Eilish karaoke',           genre:'pop',         era:'modern',  decade_min:2017, decade_max:2029, label:'Billie Eilish',       artist_lock:'Billie Eilish'   },
+  { query: 'Olivia Rodrigo karaoke',          genre:'pop',         era:'modern',  decade_min:2021, decade_max:2029, label:'Olivia Rodrigo',      artist_lock:'Olivia Rodrigo'  },
+  { query: 'Dua Lipa karaoke instrumental',   genre:'pop',         era:'modern',  decade_min:2017, decade_max:2029, label:'Dua Lipa',            artist_lock:'Dua Lipa'        },
+  { query: 'Harry Styles karaoke',            genre:'pop',         era:'modern',  decade_min:2017, decade_max:2029, label:'Harry Styles',        artist_lock:'Harry Styles'    },
+  { query: 'Ariana Grande karaoke',           genre:'pop',         era:'modern',  decade_min:2013, decade_max:2029, label:'Ariana Grande',       artist_lock:'Ariana Grande'   },
+  { query: 'Justin Bieber karaoke',           genre:'pop',         era:'modern',  decade_min:2010, decade_max:2029, label:'Justin Bieber',       artist_lock:'Justin Bieber'   },
+  { query: 'Lady Gaga karaoke instrumental',  genre:'pop',         era:'2000s',   decade_min:2008, decade_max:2015, label:'Lady Gaga',           artist_lock:'Lady Gaga'       },
+  { query: 'Beyonce karaoke instrumental',    genre:'pop',         era:'2000s',   decade_min:2003, decade_max:2016, label:'Beyonce Pop',         artist_lock:'Beyonce'         },
+  { query: 'Rihanna karaoke instrumental',    genre:'pop',         era:'2000s',   decade_min:2005, decade_max:2016, label:'Rihanna',             artist_lock:'Rihanna'         },
+  { query: 'Britney Spears karaoke',          genre:'pop',         era:'2000s',   decade_min:1998, decade_max:2011, label:'Britney Spears',      artist_lock:'Britney Spears'  },
+  { query: 'Justin Timberlake karaoke',       genre:'pop',         era:'2000s',   decade_min:2002, decade_max:2018, label:'Justin Timberlake',   artist_lock:'Justin Timberlake'},
+  { query: 'Backstreet Boys karaoke',         genre:'pop',         era:'80s90s',  decade_min:1996, decade_max:2005, label:'Backstreet Boys',     artist_lock:'Backstreet Boys' },
+  { query: 'NSYNC karaoke instrumental',      genre:'pop',         era:'80s90s',  decade_min:1996, decade_max:2002, label:'NSYNC',               artist_lock:'NSYNC'           },
+  { query: 'Spice Girls karaoke',             genre:'pop',         era:'80s90s',  decade_min:1996, decade_max:2001, label:'Spice Girls',         artist_lock:'Spice Girls'     },
+  { query: 'ABBA karaoke instrumental',       genre:'pop',         era:'60s70s',  decade_min:1972, decade_max:1982, label:'ABBA',                artist_lock:'ABBA'            },
+  { query: 'Elton John karaoke instrumental', genre:'pop',         era:'60s70s',  decade_min:1970, decade_max:1990, label:'Elton John',          artist_lock:'Elton John'      },
+  { query: 'Madonna karaoke instrumental',    genre:'pop',         era:'80s90s',  decade_min:1983, decade_max:2000, label:'Madonna',             artist_lock:'Madonna'         },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ROCK
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Karaoke Hits rock 90s',           genre:'rock',        era:'80s90s',  decade_min:1990, decade_max:1999, label:'Rock 90s'            },
+  { query: 'Karaoke Hits rock 80s',           genre:'rock',        era:'80s90s',  decade_min:1980, decade_max:1989, label:'Rock 80s'            },
+  { query: 'Karaoke Hits rock 2000s',         genre:'rock',        era:'2000s',   decade_min:2000, decade_max:2009, label:'Rock 2000s'          },
+  { query: 'Guns N Roses karaoke',            genre:'rock',        era:'80s90s',  decade_min:1987, decade_max:1999, label:'Guns N Roses',        artist_lock:"Guns N' Roses"   },
+  { query: 'Bon Jovi karaoke instrumental',   genre:'rock',        era:'80s90s',  decade_min:1984, decade_max:2000, label:'Bon Jovi',            artist_lock:'Bon Jovi'        },
+  { query: 'U2 karaoke instrumental',         genre:'rock',        era:'80s90s',  decade_min:1980, decade_max:2005, label:'U2',                  artist_lock:'U2'              },
+  { query: 'Nirvana karaoke instrumental',    genre:'rock',        era:'80s90s',  decade_min:1989, decade_max:1999, label:'Nirvana',             artist_lock:'Nirvana'         },
+  { query: 'Pearl Jam karaoke instrumental',  genre:'rock',        era:'80s90s',  decade_min:1991, decade_max:2002, label:'Pearl Jam',           artist_lock:'Pearl Jam'       },
+  { query: 'Oasis karaoke instrumental',      genre:'rock',        era:'80s90s',  decade_min:1994, decade_max:2009, label:'Oasis',               artist_lock:'Oasis'           },
+  { query: 'Green Day karaoke instrumental',  genre:'rock',        era:'2000s',   decade_min:1994, decade_max:2012, label:'Green Day',           artist_lock:'Green Day'       },
+  { query: 'Coldplay karaoke instrumental',   genre:'rock',        era:'2000s',   decade_min:2000, decade_max:2015, label:'Coldplay',            artist_lock:'Coldplay'        },
+  { query: 'Foo Fighters karaoke',            genre:'rock',        era:'2000s',   decade_min:1995, decade_max:2015, label:'Foo Fighters',        artist_lock:'Foo Fighters'    },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CLASSIC ROCK (60s / 70s)
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Queen karaoke instrumental',      genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1991, label:'Queen',              artist_lock:'Queen'           },
+  { query: 'Beatles karaoke instrumental',    genre:'classic-rock', era:'60s70s', decade_min:1963, decade_max:1970, label:'Beatles',            artist_lock:'Beatles'         },
+  { query: 'Led Zeppelin karaoke instrumental',genre:'classic-rock',era:'60s70s', decade_min:1968, decade_max:1982, label:'Led Zeppelin',       artist_lock:'Led Zeppelin'    },
+  { query: 'Rolling Stones karaoke',         genre:'classic-rock', era:'60s70s',  decade_min:1963, decade_max:1982, label:'Rolling Stones',     artist_lock:'Rolling Stones'  },
+  { query: 'Fleetwood Mac karaoke',          genre:'classic-rock', era:'60s70s',  decade_min:1968, decade_max:1990, label:'Fleetwood Mac',      artist_lock:'Fleetwood Mac'   },
+  { query: 'Eagles karaoke instrumental',    genre:'classic-rock', era:'60s70s',  decade_min:1972, decade_max:1982, label:'Eagles',             artist_lock:'Eagles'          },
+  { query: 'David Bowie karaoke instrumental',genre:'classic-rock',era:'60s70s',  decade_min:1969, decade_max:1990, label:'David Bowie',        artist_lock:'David Bowie'     },
+  { query: 'Pink Floyd karaoke instrumental', genre:'classic-rock', era:'60s70s', decade_min:1967, decade_max:1983, label:'Pink Floyd',         artist_lock:'Pink Floyd'      },
+  { query: 'Jimi Hendrix karaoke instrumental',genre:'classic-rock',era:'60s70s', decade_min:1966, decade_max:1971, label:'Jimi Hendrix',      artist_lock:'Jimi Hendrix'    },
+  { query: 'Aerosmith karaoke instrumental',  genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1999, label:'Aerosmith',         artist_lock:'Aerosmith'       },
+  { query: 'AC/DC karaoke instrumental',      genre:'classic-rock', era:'60s70s', decade_min:1975, decade_max:1995, label:'AC/DC',             artist_lock:'AC/DC'           },
+  { query: 'Bruce Springsteen karaoke',       genre:'classic-rock', era:'60s70s', decade_min:1973, decade_max:1995, label:'Bruce Springsteen', artist_lock:'Bruce Springsteen'},
+  { query: 'Van Halen karaoke instrumental',  genre:'classic-rock', era:'80s90s', decade_min:1978, decade_max:1995, label:'Van Halen',         artist_lock:'Van Halen'       },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // HIP-HOP (2000s+)
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Eminem karaoke instrumental',     genre:'hip-hop',     era:'2000s',   decade_min:1999, decade_max:2013, label:'Eminem',              artist_lock:'Eminem'          },
+  { query: 'Drake karaoke instrumental',      genre:'hip-hop',     era:'modern',  decade_min:2009, decade_max:2029, label:'Drake',               artist_lock:'Drake'           },
+  { query: 'Kanye West karaoke instrumental', genre:'hip-hop',     era:'2000s',   decade_min:2004, decade_max:2016, label:'Kanye West',          artist_lock:'Kanye West'      },
+  { query: 'Jay Z karaoke instrumental',      genre:'hip-hop',     era:'2000s',   decade_min:1996, decade_max:2014, label:'Jay-Z',               artist_lock:'Jay-Z'           },
+  { query: 'Kendrick Lamar karaoke',          genre:'hip-hop',     era:'modern',  decade_min:2011, decade_max:2029, label:'Kendrick Lamar',      artist_lock:'Kendrick Lamar'  },
+  { query: 'Post Malone karaoke',             genre:'hip-hop',     era:'modern',  decade_min:2016, decade_max:2029, label:'Post Malone',         artist_lock:'Post Malone'     },
+  { query: 'Lil Nas X karaoke',              genre:'hip-hop',     era:'modern',  decade_min:2018, decade_max:2029, label:'Lil Nas X',           artist_lock:'Lil Nas X'       },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // 90s RAP
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Tupac karaoke instrumental',      genre:'90s-rap',     era:'80s90s',  decade_min:1991, decade_max:1999, label:'Tupac',               artist_lock:'2Pac'            },
+  { query: 'Biggie Smalls karaoke instrumental',genre:'90s-rap',   era:'80s90s',  decade_min:1994, decade_max:1999, label:'Biggie',              artist_lock:'Notorious B.I.G' },
+  { query: 'Snoop Dogg 90s karaoke instrumental',genre:'90s-rap',  era:'80s90s',  decade_min:1993, decade_max:1999, label:'Snoop Dogg 90s',     artist_lock:'Snoop Dogg'      },
+  { query: 'Dr Dre karaoke instrumental 90s', genre:'90s-rap',     era:'80s90s',  decade_min:1992, decade_max:1999, label:'Dr Dre',              artist_lock:'Dr. Dre'         },
+  { query: 'Nas karaoke instrumental',        genre:'90s-rap',     era:'80s90s',  decade_min:1994, decade_max:2001, label:'Nas',                 artist_lock:'Nas'             },
+  { query: 'DMX karaoke instrumental',        genre:'90s-rap',     era:'80s90s',  decade_min:1998, decade_max:2003, label:'DMX',                 artist_lock:'DMX'             },
+  { query: 'Coolio karaoke instrumental',     genre:'90s-rap',     era:'80s90s',  decade_min:1994, decade_max:2001, label:'Coolio',              artist_lock:'Coolio'          },
+  { query: 'Missy Elliott karaoke',           genre:'90s-rap',     era:'80s90s',  decade_min:1997, decade_max:2006, label:'Missy Elliott',       artist_lock:'Missy Elliott'   },
+  { query: 'TLC karaoke instrumental',        genre:'90s-rap',     era:'80s90s',  decade_min:1992, decade_max:2002, label:'TLC',                 artist_lock:'TLC'             },
+  { query: 'Warren G karaoke instrumental',   genre:'90s-rap',     era:'80s90s',  decade_min:1994, decade_max:2001, label:'Warren G',            artist_lock:'Warren G'        },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // R&B / SOUL
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Whitney Houston karaoke',         genre:'rnb',         era:'80s90s',  decade_min:1985, decade_max:2009, label:'Whitney Houston',     artist_lock:'Whitney Houston' },
+  { query: 'Mariah Carey karaoke',            genre:'rnb',         era:'80s90s',  decade_min:1990, decade_max:2005, label:'Mariah Carey',        artist_lock:'Mariah Carey'    },
+  { query: 'Usher karaoke instrumental',      genre:'rnb',         era:'2000s',   decade_min:1997, decade_max:2012, label:'Usher',               artist_lock:'Usher'           },
+  { query: 'Alicia Keys karaoke',             genre:'rnb',         era:'2000s',   decade_min:2001, decade_max:2016, label:'Alicia Keys',         artist_lock:'Alicia Keys'     },
+  { query: 'Amy Winehouse karaoke',           genre:'rnb',         era:'2000s',   decade_min:2003, decade_max:2011, label:'Amy Winehouse',       artist_lock:'Amy Winehouse'   },
+  { query: 'The Weeknd karaoke',              genre:'rnb',         era:'modern',  decade_min:2012, decade_max:2029, label:'The Weeknd',          artist_lock:'The Weeknd'      },
+  { query: 'SZA karaoke instrumental',        genre:'rnb',         era:'modern',  decade_min:2017, decade_max:2029, label:'SZA',                 artist_lock:'SZA'             },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // SOUL / MOTOWN (classic)
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Aretha Franklin karaoke',         genre:'soul',        era:'60s70s',  decade_min:1960, decade_max:1985, label:'Aretha Franklin',     artist_lock:'Aretha Franklin' },
+  { query: 'Marvin Gaye karaoke',             genre:'soul',        era:'60s70s',  decade_min:1960, decade_max:1984, label:'Marvin Gaye',         artist_lock:'Marvin Gaye'     },
+  { query: 'Stevie Wonder karaoke',           genre:'soul',        era:'60s70s',  decade_min:1963, decade_max:1985, label:'Stevie Wonder',       artist_lock:'Stevie Wonder'   },
+  { query: 'James Brown karaoke instrumental',genre:'soul',        era:'60s70s',  decade_min:1960, decade_max:1985, label:'James Brown',         artist_lock:'James Brown'     },
+  { query: 'Otis Redding karaoke',            genre:'soul',        era:'60s70s',  decade_min:1962, decade_max:1968, label:'Otis Redding',        artist_lock:'Otis Redding'    },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // COUNTRY
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Shania Twain karaoke instrumental',genre:'country',    era:'80s90s',  decade_min:1993, decade_max:2003, label:'Shania Twain',        artist_lock:'Shania Twain'    },
+  { query: 'Dolly Parton karaoke instrumental',genre:'country',    era:'60s70s',  decade_min:1967, decade_max:1990, label:'Dolly Parton',        artist_lock:'Dolly Parton'    },
+  { query: 'Johnny Cash karaoke instrumental', genre:'country',    era:'60s70s',  decade_min:1955, decade_max:1985, label:'Johnny Cash',         artist_lock:'Johnny Cash'     },
+  { query: 'Garth Brooks karaoke instrumental',genre:'country',    era:'80s90s',  decade_min:1989, decade_max:2001, label:'Garth Brooks',        artist_lock:'Garth Brooks'    },
+  { query: 'Kenny Rogers karaoke',            genre:'country',     era:'60s70s',  decade_min:1976, decade_max:1992, label:'Kenny Rogers',        artist_lock:'Kenny Rogers'    },
+  { query: 'Luke Bryan karaoke instrumental', genre:'country',     era:'modern',  decade_min:2007, decade_max:2029, label:'Luke Bryan',          artist_lock:'Luke Bryan'      },
+  { query: 'Morgan Wallen karaoke',           genre:'country',     era:'modern',  decade_min:2018, decade_max:2029, label:'Morgan Wallen',       artist_lock:'Morgan Wallen'   },
+  { query: 'Karaoke Hits country 80s 90s',    genre:'country',     era:'80s90s',  decade_min:1980, decade_max:1999, label:'Country 80s-90s'                                    },
+  { query: 'Karaoke Hits country 2000s',      genre:'country',     era:'2000s',   decade_min:2000, decade_max:2009, label:'Country 2000s'                                       },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // DANCE / ELECTRONIC
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Daft Punk karaoke instrumental',  genre:'dance',       era:'2000s',   decade_min:1997, decade_max:2013, label:'Daft Punk',           artist_lock:'Daft Punk'       },
+  { query: 'Calvin Harris karaoke',           genre:'dance',       era:'modern',  decade_min:2007, decade_max:2029, label:'Calvin Harris',       artist_lock:'Calvin Harris'   },
+  { query: 'David Guetta karaoke',            genre:'dance',       era:'modern',  decade_min:2009, decade_max:2029, label:'David Guetta',        artist_lock:'David Guetta'    },
+  { query: 'Avicii karaoke instrumental',     genre:'dance',       era:'modern',  decade_min:2011, decade_max:2018, label:'Avicii',              artist_lock:'Avicii'          },
+  { query: 'Karaoke dance hits 2000s',        genre:'dance',       era:'2000s',   decade_min:2000, decade_max:2009, label:'Dance 2000s'                                         },
+  { query: 'Karaoke dance hits 2010s',        genre:'dance',       era:'modern',  decade_min:2010, decade_max:2019, label:'Dance 2010s'                                         },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // MOVIE SOUNDTRACKS
+  // ════════════════════════════════════════════════════════════════════════════
+  { query: 'Grease karaoke instrumental',     genre:'soundtracks', era:'60s70s',  decade_min:1978, decade_max:1979, label:'Grease'                                             },
+  { query: 'Dirty Dancing karaoke instrumental',genre:'soundtracks',era:'80s90s', decade_min:1987, decade_max:1988, label:'Dirty Dancing'                                      },
+  { query: 'Footloose karaoke instrumental',  genre:'soundtracks', era:'80s90s',  decade_min:1984, decade_max:1985, label:'Footloose'                                          },
+  { query: 'Mamma Mia movie karaoke',         genre:'soundtracks', era:'modern',  decade_min:2008, decade_max:2019, label:'Mamma Mia'                                          },
+  { query: 'Greatest Showman karaoke',        genre:'soundtracks', era:'modern',  decade_min:2017, decade_max:2018, label:'Greatest Showman'                                   },
+  { query: 'La La Land karaoke instrumental', genre:'soundtracks', era:'modern',  decade_min:2016, decade_max:2017, label:'La La Land'                                        },
+  { query: 'Encanto karaoke instrumental',    genre:'soundtracks', era:'modern',  decade_min:2021, decade_max:2022, label:'Encanto'                                            },
+  { query: 'Moana karaoke instrumental',      genre:'soundtracks', era:'modern',  decade_min:2016, decade_max:2017, label:'Moana'                                              },
+  { query: 'Frozen karaoke instrumental',     genre:'soundtracks', era:'modern',  decade_min:2013, decade_max:2020, label:'Frozen'                                             },
+  { query: 'Guardians Galaxy karaoke',        genre:'soundtracks', era:'modern',  decade_min:2014, decade_max:2019, label:'Guardians of Galaxy'                                },
+  { query: 'Disney karaoke instrumental',     genre:'soundtracks', era:'modern',  decade_min:1989, decade_max:2029, label:'Disney Mix'                                         },
+];
+
 // ─── Fetch helpers ────────────────────────────────────────────────────────────
 async function deezerFetch(url) {
-  await new Promise(r => setTimeout(r, 150));
+  await new Promise(r => setTimeout(r, 200)); // ~5 req/s — conservative
   const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
   if (!res.ok) throw new Error('Deezer HTTP ' + res.status);
   return res.json();
@@ -153,30 +321,60 @@ async function fetchInstrumentalTracks(query) {
   );
 }
 
-// ─── Insert ───────────────────────────────────────────────────────────────────
-// Note: we do NOT store preview_cache — URLs expire too fast to be useful.
-async function insertInstrumentalTracks(tracks, defaultEra, genre) {
-  if (!tracks.length) return 0;
-  let count = 0;
+// ─── Insert with strict validation ───────────────────────────────────────────
+async function insertTracks(tracks, source) {
+  if (!tracks.length) return { inserted: 0, rejected: 0 };
+  let inserted = 0;
+  let rejected = 0;
 
   for (const track of tracks) {
-    const title          = extractRealTitle(track);
-    const originalArtist = extractOriginalArtist(track) || (track.artist && track.artist.name);
+    // ── 1. Extract real title ──────────────────────────────────────────────
+    const title = extractRealTitle(track);
+    if (!title || title.length < 2) { rejected++; continue; }
 
-    if (!title || title.length < 2 || !originalArtist) continue;
-
-    // Reject bare version labels
     const lowerTitle = title.toLowerCase().trim();
-    if (['karaoke version', 'instrumental', 'backing track', 'karaoke',
-         'karaoke version of the original', 'instrumental version'].includes(lowerTitle)) continue;
+    if (['karaoke version','instrumental','backing track','karaoke',
+         'karaoke version of the original','instrumental version'].includes(lowerTitle)) {
+      rejected++; continue;
+    }
+    if (isRejectedTitle(title)) { rejected++; continue; }
 
-    // Second pass rejection on the cleaned title
-    if (isRejectedTitle(title)) continue;
+    // ── 2. Extract REAL artist — REJECT if we can't find one ──────────────
+    const realArtist = extractOriginalArtist(track);
+    if (!realArtist) {
+      // No artist attribution found in title — we cannot trust this entry
+      rejected++;
+      continue;
+    }
 
-    const era      = inferEra(track, defaultEra);
-    const decade   = track.album && track.album.release_date
-      ? parseInt(track.album.release_date.slice(0, 4)) : null;
-    const cleanArtist = originalArtist.split(/[,&]/)[0].trim();
+    // ── 3. artist_lock — if source specifies a required artist, enforce it ─
+    if (source.artist_lock) {
+      const lockNorm   = normArtist(source.artist_lock);
+      const artistNorm = normArtist(realArtist);
+      // Accept if the extracted artist contains the locked artist name
+      // (handles slight variations like "Billie Eilish" vs "Billie Eilish & Khalid")
+      if (!artistNorm.includes(lockNorm) && !lockNorm.includes(artistNorm)) {
+        rejected++;
+        continue;
+      }
+    }
+
+    // ── 4. Year / decade strict window ────────────────────────────────────
+    const year = releaseYear(track);
+    if (year !== null) {
+      if (year < source.decade_min || year > source.decade_max) {
+        // Track release year is outside the allowed window — reject
+        rejected++;
+        continue;
+      }
+    }
+    // If year is unknown (null), we still allow it — better some uncertainty
+    // than rejecting everything without a date. Era is set from source.
+
+    const era    = source.era;
+    const genre  = source.genre;
+    const decade = year;
+    const cleanArtist = realArtist.split(/[,&]/)[0].trim();
     const deezerQuery = '"' + title + '" "' + cleanArtist + '" instrumental karaoke';
 
     try {
@@ -184,162 +382,18 @@ async function insertInstrumentalTracks(tracks, defaultEra, genre) {
         'INSERT INTO songs (title, artist, era, genre, decade, deezer_query) ' +
         'VALUES ($1, $2, $3, $4, $5, $6) ' +
         'ON CONFLICT (lower(title), lower(artist)) DO NOTHING',
-        [title, originalArtist, era, genre || null, decade, deezerQuery]
+        [title, realArtist, era, genre, decade, deezerQuery]
       );
-      if (result.rowCount > 0) count++;
+      if (result.rowCount > 0) inserted++;
     } catch (err) {
-      console.warn('Insert skipped [' + title + ']:', err.message);
+      console.warn('  Insert error [' + title + ']:', err.message);
     }
   }
-  return count;
+  return { inserted, rejected };
 }
-
-// ─── Search sources — organised by genre ─────────────────────────────────────
-// genre field maps to the DB genre column and the frontend filter dropdown.
-// Supported genres so far (easily extended):
-//   pop, rock, hip-hop, rnb, country, dance, alternative,
-//   90s-rap, 2000s-pop, soundtracks, classic-rock, soul
-const SOURCES = [
-  // ── POP ──────────────────────────────────────────────────────────────────────
-  { query: 'Karaoke Hits pop modern',        era: 'modern',  genre: 'pop',          label: 'Pop Karaoke Modern'     },
-  { query: 'Karaoke Hits pop 2000s',         era: '2000s',   genre: 'pop',          label: 'Pop Karaoke 2000s'      },
-  { query: 'Karaoke Hits pop 90s',           era: '80s90s',  genre: 'pop',          label: 'Pop Karaoke 90s'        },
-  { query: 'Karaoke Hits pop 80s',           era: '80s90s',  genre: 'pop',          label: 'Pop Karaoke 80s'        },
-  { query: 'Taylor Swift karaoke',           era: 'modern',  genre: 'pop',          label: 'Taylor Swift'           },
-  { query: 'Adele karaoke instrumental',     era: 'modern',  genre: 'pop',          label: 'Adele'                  },
-  { query: 'Ed Sheeran karaoke',             era: 'modern',  genre: 'pop',          label: 'Ed Sheeran'             },
-  { query: 'Bruno Mars karaoke',             era: 'modern',  genre: 'pop',          label: 'Bruno Mars'             },
-  { query: 'Billie Eilish karaoke',          era: 'modern',  genre: 'pop',          label: 'Billie Eilish'          },
-  { query: 'Olivia Rodrigo karaoke',         era: 'modern',  genre: 'pop',          label: 'Olivia Rodrigo'         },
-  { query: 'Dua Lipa karaoke instrumental',  era: 'modern',  genre: 'pop',          label: 'Dua Lipa'               },
-  { query: 'Harry Styles karaoke',           era: 'modern',  genre: 'pop',          label: 'Harry Styles'           },
-  { query: 'Ariana Grande karaoke',          era: 'modern',  genre: 'pop',          label: 'Ariana Grande'          },
-  { query: 'Justin Bieber karaoke',          era: 'modern',  genre: 'pop',          label: 'Justin Bieber'          },
-  { query: 'Lady Gaga karaoke instrumental', era: '2000s',   genre: 'pop',          label: 'Lady Gaga'              },
-  { query: 'Beyonce karaoke instrumental',   era: '2000s',   genre: 'pop',          label: 'Beyonce Pop'            },
-  { query: 'Rihanna karaoke instrumental',   era: '2000s',   genre: 'pop',          label: 'Rihanna'                },
-  { query: 'Britney Spears karaoke',         era: '2000s',   genre: 'pop',          label: 'Britney Spears'         },
-  { query: 'Justin Timberlake karaoke',      era: '2000s',   genre: 'pop',          label: 'Justin Timberlake'      },
-  { query: 'NSYNC karaoke instrumental',     era: '80s90s',  genre: 'pop',          label: 'NSYNC'                  },
-  { query: 'Backstreet Boys karaoke',        era: '80s90s',  genre: 'pop',          label: 'Backstreet Boys'        },
-  { query: 'Spice Girls karaoke',            era: '80s90s',  genre: 'pop',          label: 'Spice Girls'            },
-  { query: 'ABBA karaoke instrumental',      era: '60s70s',  genre: 'pop',          label: 'ABBA'                   },
-  { query: 'Elton John karaoke instrumental',era: '60s70s',  genre: 'pop',          label: 'Elton John'             },
-
-  // ── ROCK ─────────────────────────────────────────────────────────────────────
-  { query: 'Karaoke Hits rock classic',      era: '60s70s',  genre: 'rock',         label: 'Classic Rock Karaoke'   },
-  { query: 'Karaoke Hits rock 80s',          era: '80s90s',  genre: 'rock',         label: 'Rock Karaoke 80s'       },
-  { query: 'Karaoke Hits rock 90s',          era: '80s90s',  genre: 'rock',         label: 'Rock Karaoke 90s'       },
-  { query: 'Queen karaoke instrumental',     era: '60s70s',  genre: 'rock',         label: 'Queen'                  },
-  { query: 'Beatles karaoke instrumental',   era: '60s70s',  genre: 'rock',         label: 'Beatles'                },
-  { query: 'Led Zeppelin karaoke instrumental',era:'60s70s', genre: 'rock',         label: 'Led Zeppelin'           },
-  { query: 'Rolling Stones karaoke',         era: '60s70s',  genre: 'rock',         label: 'Rolling Stones'         },
-  { query: 'Fleetwood Mac karaoke',          era: '60s70s',  genre: 'rock',         label: 'Fleetwood Mac'          },
-  { query: 'Eagles karaoke instrumental',    era: '60s70s',  genre: 'rock',         label: 'Eagles'                 },
-  { query: 'David Bowie karaoke instrumental',era:'60s70s',  genre: 'rock',         label: 'David Bowie'            },
-  { query: 'Guns N Roses karaoke',           era: '80s90s',  genre: 'rock',         label: 'Guns N Roses'           },
-  { query: 'Bon Jovi karaoke instrumental',  era: '80s90s',  genre: 'rock',         label: 'Bon Jovi'               },
-  { query: 'U2 karaoke instrumental',        era: '80s90s',  genre: 'rock',         label: 'U2'                     },
-  { query: 'Nirvana karaoke instrumental',   era: '80s90s',  genre: 'rock',         label: 'Nirvana'                },
-  { query: 'Pearl Jam karaoke instrumental', era: '80s90s',  genre: 'rock',         label: 'Pearl Jam'              },
-  { query: 'Oasis karaoke instrumental',     era: '80s90s',  genre: 'rock',         label: 'Oasis'                  },
-  { query: 'Green Day karaoke instrumental', era: '2000s',   genre: 'rock',         label: 'Green Day'              },
-  { query: 'Coldplay karaoke instrumental',  era: '2000s',   genre: 'rock',         label: 'Coldplay'               },
-  { query: 'Foo Fighters karaoke',           era: '2000s',   genre: 'rock',         label: 'Foo Fighters'           },
-
-  // ── HIP-HOP / RAP ────────────────────────────────────────────────────────────
-  { query: 'Eminem karaoke instrumental',    era: '2000s',   genre: 'hip-hop',      label: 'Eminem'                 },
-  { query: 'Drake karaoke instrumental',     era: 'modern',  genre: 'hip-hop',      label: 'Drake'                  },
-  { query: 'Kanye West karaoke instrumental',era: '2000s',   genre: 'hip-hop',      label: 'Kanye West'             },
-  { query: 'Jay Z karaoke instrumental',     era: '2000s',   genre: 'hip-hop',      label: 'Jay-Z'                  },
-  { query: 'Kendrick Lamar karaoke',         era: 'modern',  genre: 'hip-hop',      label: 'Kendrick Lamar'         },
-  { query: 'Post Malone karaoke',            era: 'modern',  genre: 'hip-hop',      label: 'Post Malone'            },
-  { query: 'Travis Scott karaoke',           era: 'modern',  genre: 'hip-hop',      label: 'Travis Scott'           },
-  { query: 'Lil Nas X karaoke',              era: 'modern',  genre: 'hip-hop',      label: 'Lil Nas X'              },
-
-  // ── 90s RAP (its own genre for the dropdown) ──────────────────────────────────
-  { query: 'Tupac karaoke instrumental',     era: '80s90s',  genre: '90s-rap',      label: 'Tupac'                  },
-  { query: 'Biggie karaoke instrumental',    era: '80s90s',  genre: '90s-rap',      label: 'Biggie'                 },
-  { query: 'Snoop Dogg karaoke 90s',         era: '80s90s',  genre: '90s-rap',      label: 'Snoop Dogg 90s'         },
-  { query: 'Dr Dre karaoke instrumental',    era: '80s90s',  genre: '90s-rap',      label: 'Dr Dre'                 },
-  { query: 'Warren G karaoke instrumental',  era: '80s90s',  genre: '90s-rap',      label: 'Warren G'               },
-  { query: 'Nas karaoke instrumental',       era: '80s90s',  genre: '90s-rap',      label: 'Nas'                    },
-  { query: 'DMX karaoke instrumental',       era: '80s90s',  genre: '90s-rap',      label: 'DMX'                    },
-  { query: 'Wu-Tang Clan karaoke',           era: '80s90s',  genre: '90s-rap',      label: 'Wu-Tang Clan'           },
-  { query: 'Coolio karaoke instrumental',    era: '80s90s',  genre: '90s-rap',      label: 'Coolio'                 },
-  { query: 'Missy Elliott karaoke',          era: '80s90s',  genre: '90s-rap',      label: 'Missy Elliott'          },
-  { query: 'TLC karaoke instrumental',       era: '80s90s',  genre: '90s-rap',      label: 'TLC'                    },
-
-  // ── R&B / SOUL ───────────────────────────────────────────────────────────────
-  { query: 'Aretha Franklin karaoke',        era: '60s70s',  genre: 'rnb',          label: 'Aretha Franklin'        },
-  { query: 'Marvin Gaye karaoke',            era: '60s70s',  genre: 'rnb',          label: 'Marvin Gaye'            },
-  { query: 'Stevie Wonder karaoke',          era: '60s70s',  genre: 'rnb',          label: 'Stevie Wonder'          },
-  { query: 'Whitney Houston karaoke',        era: '80s90s',  genre: 'rnb',          label: 'Whitney Houston'        },
-  { query: 'Mariah Carey karaoke',           era: '80s90s',  genre: 'rnb',          label: 'Mariah Carey'           },
-  { query: 'Usher karaoke instrumental',     era: '2000s',   genre: 'rnb',          label: 'Usher'                  },
-  { query: 'Alicia Keys karaoke',            era: '2000s',   genre: 'rnb',          label: 'Alicia Keys'            },
-  { query: 'Amy Winehouse karaoke',          era: '2000s',   genre: 'rnb',          label: 'Amy Winehouse'          },
-  { query: 'Sam Smith karaoke instrumental', era: 'modern',  genre: 'rnb',          label: 'Sam Smith'              },
-  { query: 'The Weeknd karaoke',             era: 'modern',  genre: 'rnb',          label: 'The Weeknd'             },
-  { query: 'Frank Ocean karaoke',            era: 'modern',  genre: 'rnb',          label: 'Frank Ocean'            },
-  { query: 'SZA karaoke instrumental',       era: 'modern',  genre: 'rnb',          label: 'SZA'                    },
-
-  // ── COUNTRY ──────────────────────────────────────────────────────────────────
-  { query: 'Karaoke Hits country classic',   era: '60s70s',  genre: 'country',      label: 'Classic Country Karaoke'},
-  { query: 'Karaoke Hits country 90s',       era: '80s90s',  genre: 'country',      label: 'Country Karaoke 90s'    },
-  { query: 'Karaoke Hits country modern',    era: 'modern',  genre: 'country',      label: 'Country Karaoke Modern' },
-  { query: 'Dolly Parton karaoke',           era: '60s70s',  genre: 'country',      label: 'Dolly Parton'           },
-  { query: 'Johnny Cash karaoke',            era: '60s70s',  genre: 'country',      label: 'Johnny Cash'            },
-  { query: 'Garth Brooks karaoke',           era: '80s90s',  genre: 'country',      label: 'Garth Brooks'           },
-  { query: 'Shania Twain karaoke',           era: '80s90s',  genre: 'country',      label: 'Shania Twain'           },
-  { query: 'Luke Bryan karaoke instrumental',era: 'modern',  genre: 'country',      label: 'Luke Bryan'             },
-  { query: 'Morgan Wallen karaoke',          era: 'modern',  genre: 'country',      label: 'Morgan Wallen'          },
-
-  // ── DANCE / ELECTRONIC ───────────────────────────────────────────────────────
-  { query: 'Karaoke dance hits modern',      era: 'modern',  genre: 'dance',        label: 'Dance Karaoke Modern'   },
-  { query: 'Karaoke dance hits 2000s',       era: '2000s',   genre: 'dance',        label: 'Dance Karaoke 2000s'    },
-  { query: 'Daft Punk karaoke instrumental', era: '2000s',   genre: 'dance',        label: 'Daft Punk'              },
-  { query: 'Calvin Harris karaoke',          era: 'modern',  genre: 'dance',        label: 'Calvin Harris'          },
-  { query: 'David Guetta karaoke',           era: 'modern',  genre: 'dance',        label: 'David Guetta'           },
-  { query: 'Avicii karaoke instrumental',    era: 'modern',  genre: 'dance',        label: 'Avicii'                 },
-
-  // ── SOUNDTRACKS / MOVIE ──────────────────────────────────────────────────────
-  { query: 'movie soundtrack karaoke instrumental', era: 'modern', genre: 'soundtracks', label: 'Movie Soundtracks' },
-  { query: 'Disney karaoke instrumental',           era: 'modern', genre: 'soundtracks', label: 'Disney'            },
-  { query: 'Grease karaoke instrumental',           era: '60s70s', genre: 'soundtracks', label: 'Grease'            },
-  { query: 'Dirty Dancing karaoke',                 era: '80s90s', genre: 'soundtracks', label: 'Dirty Dancing'     },
-  { query: 'Footloose karaoke instrumental',        era: '80s90s', genre: 'soundtracks', label: 'Footloose'         },
-  { query: 'Mamma Mia karaoke instrumental',        era: 'modern', genre: 'soundtracks', label: 'Mamma Mia'         },
-  { query: 'Bohemian Rhapsody movie karaoke',       era: 'modern', genre: 'soundtracks', label: 'Bohemian Rhapsody Movie'},
-  { query: 'Guardians Galaxy karaoke',              era: 'modern', genre: 'soundtracks', label: 'Guardians of Galaxy'},
-  { query: 'La La Land karaoke instrumental',       era: 'modern', genre: 'soundtracks', label: 'La La Land'        },
-  { query: 'Greatest Showman karaoke',              era: 'modern', genre: 'soundtracks', label: 'Greatest Showman'  },
-  { query: 'Encanto karaoke instrumental',          era: 'modern', genre: 'soundtracks', label: 'Encanto'           },
-  { query: 'Moana karaoke instrumental',            era: 'modern', genre: 'soundtracks', label: 'Moana'             },
-
-  // ── CLASSIC ROCK (60s-70s specific) ──────────────────────────────────────────
-  { query: 'classic rock 60s karaoke instrumental', era: '60s70s', genre: 'classic-rock', label: '60s Rock Sweep'   },
-  { query: 'classic rock 70s karaoke instrumental', era: '60s70s', genre: 'classic-rock', label: '70s Rock Sweep'   },
-  { query: 'Pink Floyd karaoke instrumental',       era: '60s70s', genre: 'classic-rock', label: 'Pink Floyd'       },
-  { query: 'Jimi Hendrix karaoke instrumental',     era: '60s70s', genre: 'classic-rock', label: 'Jimi Hendrix'     },
-  { query: 'The Doors karaoke instrumental',        era: '60s70s', genre: 'classic-rock', label: 'The Doors'        },
-  { query: 'Creedence Clearwater karaoke',          era: '60s70s', genre: 'classic-rock', label: 'CCR'              },
-  { query: 'Aerosmith karaoke instrumental',        era: '60s70s', genre: 'classic-rock', label: 'Aerosmith'        },
-  { query: 'AC/DC karaoke instrumental',            era: '60s70s', genre: 'classic-rock', label: 'AC/DC'            },
-  { query: 'Van Halen karaoke instrumental',        era: '80s90s', genre: 'classic-rock', label: 'Van Halen'        },
-  { query: 'Bruce Springsteen karaoke',             era: '60s70s', genre: 'classic-rock', label: 'Bruce Springsteen'},
-
-  // ── SOUL / MOTOWN ─────────────────────────────────────────────────────────────
-  { query: 'Motown karaoke instrumental 60s',       era: '60s70s', genre: 'soul',    label: 'Motown 60s'            },
-  { query: 'Motown karaoke instrumental 70s',       era: '60s70s', genre: 'soul',    label: 'Motown 70s'            },
-  { query: 'James Brown karaoke instrumental',      era: '60s70s', genre: 'soul',    label: 'James Brown'           },
-  { query: 'Otis Redding karaoke',                  era: '60s70s', genre: 'soul',    label: 'Otis Redding'          },
-  { query: 'Sam Cooke karaoke instrumental',        era: '60s70s', genre: 'soul',    label: 'Sam Cooke'             },
-];
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 async function ensureSchema() {
-  // Create table — genre column included from the start
   await pool.query(
     'CREATE TABLE IF NOT EXISTS songs (' +
     '  id           SERIAL PRIMARY KEY,' +
@@ -353,34 +407,19 @@ async function ensureSchema() {
     '  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()' +
     ')'
   );
-
-  // Add genre column if upgrading from an older schema
-  await pool.query(
-    'ALTER TABLE songs ADD COLUMN IF NOT EXISTS genre TEXT'
-  ).catch(() => {});
-
-  // Remove preview_cache columns if they exist from an older schema
-  // (they cause 403s — Deezer tokens expire in ~30 min)
-  await pool.query(
-    'ALTER TABLE songs DROP COLUMN IF EXISTS preview_cache'
-  ).catch(() => {});
-  await pool.query(
-    'ALTER TABLE songs DROP COLUMN IF EXISTS preview_cached_at'
-  ).catch(() => {});
+  // Add genre column to existing DBs
+  await pool.query('ALTER TABLE songs ADD COLUMN IF NOT EXISTS genre TEXT').catch(() => {});
+  // Drop stale preview cache columns — Deezer tokens expire in ~30 min
+  await pool.query('ALTER TABLE songs DROP COLUMN IF EXISTS preview_cache').catch(() => {});
+  await pool.query('ALTER TABLE songs DROP COLUMN IF EXISTS preview_cached_at').catch(() => {});
 
   await pool.query(
     'CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_title_artist_unique ' +
     'ON songs (lower(title), lower(artist))'
   );
-  await pool.query(
-    'CREATE INDEX IF NOT EXISTS idx_songs_era_enabled ON songs (era, enabled)'
-  );
-  await pool.query(
-    'CREATE INDEX IF NOT EXISTS idx_songs_genre_enabled ON songs (genre, enabled)'
-  );
-  await pool.query(
-    'CREATE INDEX IF NOT EXISTS idx_songs_enabled ON songs (enabled)'
-  );
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_songs_era_enabled ON songs (era, enabled)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_songs_genre_enabled ON songs (genre, enabled)');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_songs_enabled ON songs (enabled)');
 }
 
 // ─── Main ingest ──────────────────────────────────────────────────────────────
@@ -396,19 +435,23 @@ async function ingestFromDeezer(options) {
     return { skipped: true, existing };
   }
 
-  console.log('Starting instrumental-only ingest (' + existing + ' in DB)...');
-
+  console.log('Starting strict instrumental ingest (' + existing + ' in DB)...');
   const started = Date.now();
   let totalInserted = 0;
+  let totalRejected = 0;
   let errors = 0;
 
   for (const source of SOURCES) {
     try {
-      const tracks   = await fetchInstrumentalTracks(source.query);
-      const inserted = await insertInstrumentalTracks(tracks, source.era, source.genre);
+      const tracks  = await fetchInstrumentalTracks(source.query);
+      const { inserted, rejected } = await insertTracks(tracks, source);
       totalInserted += inserted;
+      totalRejected += rejected;
       if (tracks.length > 0) {
-        console.log('  OK [' + source.genre + '] ' + source.label + ': ' + tracks.length + ' found, ' + inserted + ' new');
+        console.log(
+          '  [' + source.genre + '] ' + source.label +
+          ': ' + tracks.length + ' fetched, ' + inserted + ' inserted, ' + rejected + ' rejected'
+        );
       }
     } catch (err) {
       errors++;
@@ -418,8 +461,11 @@ async function ingestFromDeezer(options) {
 
   const elapsed = ((Date.now() - started) / 1000).toFixed(1);
   const finalRes = await pool.query('SELECT COUNT(*) AS n FROM songs WHERE enabled = true');
-  console.log('Ingest done in ' + elapsed + 's — ' + finalRes.rows[0].n + ' total songs');
-  return { totalInserted, total: parseInt(finalRes.rows[0].n), elapsed, errors };
+  console.log(
+    'Ingest done in ' + elapsed + 's — ' + finalRes.rows[0].n + ' songs total' +
+    ' (' + totalRejected + ' rejected by strict filter)'
+  );
+  return { totalInserted, totalRejected, total: parseInt(finalRes.rows[0].n), elapsed, errors };
 }
 
 module.exports = { ingestFromDeezer, ensureSchema };
