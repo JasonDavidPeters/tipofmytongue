@@ -191,7 +191,124 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-// ─── GET /api/admin/clean ─────────────────────────────────────────────────────
+// ─── GET /api/admin/debug-ingest ──────────────────────────────────────────────
+// Runs the full ingest pipeline for ONE Deezer search query and returns a
+// detailed breakdown of every track — what Deezer returned and exactly which
+// filter rejected it. Used to diagnose why artists get too few songs.
+// Call: GET /api/admin/debug-ingest?q=Coldplay+karaoke+instrumental
+app.get('/api/admin/debug-ingest', async (req, res) => {
+  const query = req.query.q;
+  if (!query) return res.status(400).json({ error: 'Need ?q= param' });
+
+  // Inline the same filters used in catalog.js
+  const INSTRUMENTAL_KEYWORDS = [
+    'instrumental','karaoke','backing track','backing version',
+    'minus one','no vocal','no voice','music only',
+    'piano version','orchestra version','orchestral version',
+    'acoustic instrumental','in the style of','tribute instrumental',
+  ];
+  const REJECT_PATTERNS = [
+    /\bmedley\b/i,/\bmegamix\b/i,/\bmashup\b/i,/\bmash.?up\b/i,
+    /\bcollection\b/i,/\bcompilation\b/i,/\d+\s+(hits|songs|classics)\s+in\s+\d+/i,
+    /\bnon.?stop\b/i,/\bparty\s+mix\b/i,/\bkaraoke\s+megamix\b/i,
+  ];
+
+  const TITLE_STRIP = [
+    /\s*\(originally performed by[^)]*\)/gi,
+    /\s*\(originally recorded by[^)]*\)/gi,
+    /\s*\(in the style of[^)]*\)/gi,
+    /\s*\(karaoke[^)]*\)/gi,
+    /\s*\(instrumental[^)]*\)/gi,
+    /\s*\(backing track[^)]*\)/gi,
+    /\s*\[karaoke[^\]]*\]/gi,
+    /\s*\[instrumental[^\]]*\]/gi,
+    /\s*[-\u2013]\s*(karaoke|instrumental|backing track)[^\n]*/gi,
+  ];
+  const ARTIST_PATTERNS = [
+    /originally performed by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+    /originally recorded by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+    /in the style of\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+    /made famous by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+    /as performed by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  ];
+
+  function cleanTitle(raw) {
+    let s = raw || '';
+    for (const p of TITLE_STRIP) s = s.replace(p, '');
+    return s.trim();
+  }
+  function extractTitle(track) {
+    const sc = cleanTitle(track.title_short || '');
+    return sc.length > 1 ? sc : cleanTitle(track.title || '');
+  }
+  function extractArtist(track) {
+    for (const p of ARTIST_PATTERNS) {
+      const m = (track.title || '').match(p);
+      if (m) return m[1].replace(/\s*[-\u2013]\s*(karaoke|instrumental).*/i,'').trim();
+    }
+    return null;
+  }
+
+  try {
+    const url = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=100`;
+    const r   = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    const d   = await r.json();
+    const raw = d.data || [];
+
+    const results = raw.map(t => {
+      const title      = extractTitle(t);
+      const artist     = extractArtist(t);
+      const titleLower = (t.title || '').toLowerCase();
+      const versionLow = (t.title_version || '').toLowerCase();
+
+      const isInstr    = INSTRUMENTAL_KEYWORDS.some(kw => titleLower.includes(kw) || versionLow.includes(kw));
+      const hasPreview = !!t.preview;
+      const goodDur    = t.duration >= 60 && t.duration <= 600;
+      const notReject  = !REJECT_PATTERNS.some(p => p.test(t.title || ''));
+
+      let rejection = null;
+      if (!hasPreview)  rejection = 'no_preview';
+      else if (!isInstr) rejection = 'not_instrumental';
+      else if (!goodDur) rejection = `bad_duration_${t.duration}s`;
+      else if (!notReject) rejection = 'rejected_title_pattern';
+
+      return {
+        passes:       !rejection,
+        rejection,
+        deezer_title:  t.title,
+        deezer_version:t.title_version || '',
+        deezer_artist: t.artist?.name || '',
+        extracted_title: title,
+        extracted_artist: artist,
+        duration:      t.duration,
+        preview:       hasPreview,
+        album:         t.album?.title || '',
+        release_date:  t.album?.release_date || '',
+      };
+    });
+
+    const passing  = results.filter(r => r.passes);
+    const rejected = results.filter(r => !r.passes);
+
+    // Tally rejection reasons
+    const reasons = {};
+    rejected.forEach(r => { reasons[r.rejection] = (reasons[r.rejection] || 0) + 1; });
+
+    res.json({
+      query,
+      total_returned: raw.length,
+      passing:        passing.length,
+      rejected:       rejected.length,
+      rejection_breakdown: reasons,
+      passing_tracks: passing,
+      rejected_sample: rejected.slice(0, 20),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Removes songs from the DB that are clearly wrong:
 //   1. Songs stored under a locked artist but whose year falls outside that
 //      artist's known decade window (e.g. Balada para Adelina under Adele)
