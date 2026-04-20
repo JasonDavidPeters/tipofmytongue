@@ -54,13 +54,17 @@ function hasSensibleDuration(track) {
 // ─── Title cleaning ───────────────────────────────────────────────────────────
 const TITLE_STRIP = [
   /\s*\(originally performed by[^)]*\)/gi,
+  /\s*\(originally perfomed by[^)]*\)/gi,   // common typo in publisher metadata
   /\s*\(originally recorded by[^)]*\)/gi,
   /\s*\(originally popularized by[^)]*\)/gi,
+  /\s*\(originally by[^)]*\)/gi,
   /\s*\(made famous by[^)]*\)/gi,
+  /\s*\(made popular by[^)]*\)/gi,
   /\s*\(as made famous by[^)]*\)/gi,
   /\s*\(as performed by[^)]*\)/gi,
   /\s*\(in the style of[^)]*\)/gi,
   /\s*\(tribute to[^)]*\)/gi,
+  /\s*\(by [^)]+\)/gi,                       // "(By Coldplay)", "(By Beatles)"
   /\s*\(karaoke[^)]*\)/gi,
   /\s*\(instrumental[^)]*\)/gi,
   /\s*\(backing track[^)]*\)/gi,
@@ -69,8 +73,10 @@ const TITLE_STRIP = [
   /\s*\(no vocal[^)]*\)/gi,
   /\s*\(cover[^)]*\)/gi,
   /\s*\(without vocals[^)]*\)/gi,
+  /\s*\(acoustic[^)]*\)/gi,
   /\s*\[originally[^\]]*\]/gi,
   /\s*\[in the style[^\]]*\]/gi,
+  /\s*\[by [^\]]+\]/gi,                     // "[By Beatles]"
   /\s*\[karaoke[^\]]*\]/gi,
   /\s*\[instrumental[^\]]*\]/gi,
   /\s*[-\u2013]\s*(karaoke|instrumental|backing track|piano version|minus one|in the style of)[^\n]*/gi,
@@ -92,14 +98,19 @@ function extractRealTitle(track) {
 // artist name IS the artist — we don't need to parse it from the title.
 const ARTIST_PATTERNS = [
   /originally performed by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /originally perfomed by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,   // common publisher typo
   /originally recorded by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /originally popularized by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /originally by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /made famous by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /made popular by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /as made famous by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /as performed by\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /in the style of\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
   /tribute to\s+([^)([\]\n]+?)(?:\s*[\(\[]|$)/i,
+  /\(by\s+([^)]+?)\)\s*\(/i,       // "(By Beatles) (" — followed by another paren
+  /\(by\s+([^)]+?)\)\s*$/i,        // "(By Beatles)" at end of string
+  /\[by\s+([^\]]+?)\]/i,           // "[By Beatles]"
   /\[([^\]]+?)\s+karaoke]/i,
   /\(([^)]+?)\s+karaoke\)/i,
 ];
@@ -929,17 +940,16 @@ async function insertTracks(tracks, source) {
     }
 
     // 5. Validate year against source's decade window
-    //    For artist_lock sources: if year is unknown we REJECT the track.
-    //    We cannot verify it belongs to this artist, so we don't trust it.
-    //    (This prevents "Balada para Adelina" from appearing in Adele's playlist.)
-    //    For non-locked genre sources: null year is acceptable — insert with decade=null.
+    //    If we found a year (from KNOWN_YEARS or Deezer cross-ref), validate it
+    //    strictly against the source window. This catches misattributed songs
+    //    like "Balada para Adelina" (1977) appearing in Adele's playlist (2008+).
+    //    If year is null (Deezer karaoke tracks rarely have album dates), allow
+    //    the track through — the search query already scopes to the right artist.
+    //    We set decade=null which shows as "year unknown" on the reveal card.
     if (originalYear !== null) {
       if (originalYear < source.decade_min || originalYear > source.decade_max) {
         rejected++; continue;
       }
-    } else if (source.artist_lock) {
-      // Couldn't verify year for a locked-artist track — too risky, reject
-      rejected++; continue;
     }
 
     const era          = source.era;
