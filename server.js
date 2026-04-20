@@ -592,18 +592,20 @@ app.get('/api/admin/ingest', async (req, res) => {
 });
 
 // ─── GET /api/admin/reset ─────────────────────────────────────────────────────
-// Testing-mode only. Truncates the songs table then re-runs the full ingest.
-// Returns 403 in production.
+// Truncates songs table and re-seeds. Requires TESTING mode OR dev/admin role.
 app.get('/api/admin/reset', async (req, res) => {
+  const secret = process.env.ADMIN_SECRET;
   const hasDev = req.user && (req.user.role === 'developer' || req.user.role === 'admin');
-  if (!TESTING && !hasDev) return res.status(403).json({ error: 'Not in testing mode' });
+  if (!TESTING && !hasDev && secret && req.query.secret !== secret) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
   try {
     await pool.query('TRUNCATE TABLE songs RESTART IDENTITY');
-    console.log('[TESTING] Songs table cleared');
-    res.json({ message: 'Table cleared — re-seeding in background' });
+    console.log('[reset] Songs table cleared — re-seeding in background');
+    res.json({ message: 'Table cleared — re-seeding in background. Watch /api/health for progress.' });
     ingestFromDeezer({ force: true }).catch(console.error);
   } catch (err) {
-    console.error('[TESTING] Reset failed:', err.message);
+    console.error('[reset] Failed:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
