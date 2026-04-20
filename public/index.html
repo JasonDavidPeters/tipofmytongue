@@ -252,6 +252,7 @@
   .guess-field::placeholder { color:var(--muted); }
   .guess-field:focus   { border-color:rgba(232,255,71,0.4); }
   .guess-field.correct { border-color:var(--accent3) !important; background:rgba(77,255,180,0.04); color:var(--accent3); }
+  .guess-field.close   { border-color:#f5a623 !important; background:rgba(245,166,35,0.04); color:#f5a623; }
   .guess-field.wrong   { border-color:var(--accent2); animation:shake 0.35s ease; }
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
   .guess-actions { display:flex; gap:10px; }
@@ -712,10 +713,12 @@ function renderPlayers(){
   const list=document.getElementById('player-list');
   list.innerHTML='';
   for(let i=0;i<playerCount;i++){
+    // Player 1 defaults to logged-in username if available
+    const defaultName = (i===0 && currentUser) ? currentUser.username : DN[i];
     const d=document.createElement('div'); d.className='player-entry';
     d.innerHTML=`
       <div class="player-num">${i+1}</div>
-      <input class="form-input" id="pn${i}" type="text" value="${DN[i]}" placeholder="${DN[i]}" maxlength="20" style="font-family:'DM Sans',sans-serif;">
+      <input class="form-input" id="pn${i}" type="text" value="${defaultName}" placeholder="${defaultName}" maxlength="20" style="font-family:'DM Sans',sans-serif;">
       ${playerCount>1?`<button class="remove-player" onclick="removePlayer(${i})">✕</button>`:''}
     `;
     list.appendChild(d);
@@ -772,6 +775,16 @@ async function startGame(){
     const data=await res.json();
     songs=data.songs;
     if(!songs?.length) throw new Error('No songs returned');
+    // Deduplicate by normalised title — "Boats" and "Boats (Karaoke Edition)"
+    // are the same song. Keep the first occurrence (random order from DB).
+    const seenTitles = new Set();
+    songs = songs.filter(s => {
+      const norm = s.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+      if (seenTitles.has(norm)) return false;
+      seenTitles.add(norm);
+      return true;
+    });
+    if(!songs.length) throw new Error('No songs after deduplication');
   } catch(err){
     showToast('Could not load songs — check your connection','error');
     showScreen('setup'); return;
@@ -1087,11 +1100,13 @@ function pts(e,t){return e<=5?(t==='song'?500:300):e<=10?(t==='song'?350:200):(t
 function yearPoints(guessedYear, actualYear, elapsed){
   if(!actualYear||isNaN(guessedYear)) return 0;
   const diff = Math.abs(guessedYear - actualYear);
-  const base = pts(elapsed, 'artist'); // same bracket as artist guess
-  if(diff === 0) return base;
-  if(diff === 1) return Math.round(base * 0.6);
-  if(diff === 2) return Math.round(base * 0.25);
-  return 0;
+  const base = pts(elapsed, 'artist');
+  if(diff === 0) return base;          // exact — full points, marked correct
+  if(diff === 1) return Math.round(base * 0.5); // close — half points, NOT marked correct
+  return 0;                            // ±2+ — no points
+}
+function yearIsExact(guessedYear, actualYear){
+  return actualYear && !isNaN(guessedYear) && Math.abs(guessedYear - actualYear) === 0;
 }
 
 function submitGuess(){
@@ -1114,11 +1129,21 @@ function submitGuess(){
       }else{markInput('guess-song-am','wrong');}
     }
     if(!G.yearGuessed&&yg.trim()){
-      const yp=yearPoints(parseInt(yg),song.decade,elapsed);
-      if(yp>0){
+      const yg_int=parseInt(yg);
+      const yp=yearPoints(yg_int,song.decade,elapsed);
+      const exact=yearIsExact(yg_int,song.decade);
+      if(exact){
+        // Exact match — full credit, mark correct, end year guessing
         G.yearGuessed=true;G.scores[player]+=yp;delta+=yp;
         markInput('guess-year','correct');showToast(`📅 Year! +${yp} pts`,'success');
-      }else{markInput('guess-year','wrong');}
+      } else if(yp>0){
+        // Close (±1) — partial credit, NOT marked correct, can try again
+        G.scores[player]+=yp;delta+=yp;
+        markInput('guess-year','close');showToast(`📅 Close! +${yp} pts — try again`,'info');
+        document.getElementById('guess-year').value='';
+      } else {
+        markInput('guess-year','wrong');
+      }
     }
     if(delta)updateScoreboard(player,delta);
     if(G.titleGuessed&&G.yearGuessed){
@@ -1554,6 +1579,7 @@ async function doLogin() {
     localStorage.setItem('toyt_token', authToken);
     closeAuthModal();
     updateProfileUI();
+    renderPlayers(); // update Player 1 name to logged-in username
     showToast('Welcome back, ' + currentUser.username + '!', 'success');
   } catch(e) {
     showAuthError('Network error — please try again');
@@ -1580,6 +1606,7 @@ async function doRegister() {
     localStorage.setItem('toyt_token', authToken);
     closeAuthModal();
     updateProfileUI();
+    renderPlayers(); // update Player 1 name to registered username
     showToast('Welcome to TOYT, ' + currentUser.username + '! 🎵', 'success');
   } catch(e) {
     showAuthError('Network error — please try again');
@@ -1593,6 +1620,7 @@ async function doLogout() {
   authToken = null; currentUser = null;
   localStorage.removeItem('toyt_token');
   updateProfileUI();
+  renderPlayers(); // revert Player 1 back to "Player 1"
   showToast('Signed out', 'info');
 }
 
