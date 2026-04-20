@@ -855,6 +855,11 @@ async function beginRound(){
   setTimerUI(15,15); setVinyl('loading'); setStatus('load','⏳ Loading instrumental…');
   updateScoreboard();
 
+  // Warm the Audio element synchronously (before any await) so the browser
+  // keeps the user-gesture context alive for autoplay permission.
+  const a = getAudio();
+  a.src = '';
+
   let previewUrl=null;
   try{
     const res=await fetch(`/api/preview?id=${song.id}`);
@@ -1425,10 +1430,11 @@ function initHomeAnimations() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  // Run each init independently — one failure must not block the others
-  renderPlayers();
+  // initAuth must complete first so currentUser is set before renderPlayers runs
+  initAuth()
+    .catch(e => console.warn('initAuth failed:', e))
+    .finally(() => renderPlayers()); // now currentUser is known
   initTestingMode().catch(e => console.warn('initTestingMode failed:', e));
-  initAuth().catch(e => console.warn('initAuth failed:', e));
   initHomeAnimations();
 });
 
