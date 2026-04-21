@@ -426,7 +426,8 @@
   .pd-item {
     padding: 10px 16px; font-size: 13px; cursor: pointer;
     display: flex; align-items: center; gap: 10px; color: var(--text);
-    transition: background 0.1s;
+    transition: background 0.1s; width: 100%; text-align: left;
+    background: none; border: none; font-family: inherit;
   }
   .pd-item:hover { background: var(--surface2); }
   .pd-item.danger { color: var(--accent2); }
@@ -1904,29 +1905,36 @@ async function doLogout() {
 // ── Change avatar (inline prompt for MVP) ────────────────────────────────────
 let pendingAvatarId = null;
 
-async function openAvatarChange() {
+function openAvatarChange() {
+  console.log('[avatar] openAvatarChange called, currentUser:', currentUser, 'avatars:', availableAvatars.length);
   document.getElementById('profile-dropdown').classList.remove('open');
-  if (!currentUser) { showToast('Please sign in to change your avatar', 'error'); return; }
-  // Fetch avatars if not yet loaded
-  if (!availableAvatars.length) {
-    try {
-      const r = await fetch('/api/auth/avatars');
-      const d = await r.json();
-      availableAvatars = d.avatars || [];
-    } catch(e) { /* ignore */ }
-  }
-  if (!availableAvatars.length) { showToast('Could not load avatars', 'error'); return; }
-  // Build avatar grid
+  if (!currentUser) { showToast('Please sign in first', 'error'); return; }
   pendingAvatarId = currentUser.avatar || null;
   const grid = document.getElementById('avatar-change-grid');
-  if (!grid) { console.error('avatar-change-grid element not found'); return; }
-  grid.innerHTML = availableAvatars.map(a =>
-    `<div class="avatar-cell${a.id===pendingAvatarId?' selected':''}"
-          onclick="selectAvatarCell('${a.id}',this)">
-       ${a.emoji}<span>${a.label}</span>
-     </div>`
-  ).join('');
-  document.getElementById('avatar-overlay').classList.add('open');
+  if (!grid) { console.error('[avatar] avatar-change-grid not found'); return; }
+  if (availableAvatars.length) {
+    // Already loaded — build grid immediately
+    grid.innerHTML = availableAvatars.map(a =>
+      `<div class="avatar-cell${a.id===pendingAvatarId?' selected':''}"
+            onclick="selectAvatarCell('${a.id}',this)">
+         ${a.emoji}<span>${a.label}</span>
+       </div>`
+    ).join('');
+    document.getElementById('avatar-overlay').classList.add('open');
+  } else {
+    // Not yet loaded — show overlay with spinner then fetch
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);">Loading…</div>';
+    document.getElementById('avatar-overlay').classList.add('open');
+    fetch('/api/auth/avatars').then(r=>r.json()).then(d=>{
+      availableAvatars = d.avatars || [];
+      grid.innerHTML = availableAvatars.map(a =>
+        `<div class="avatar-cell${a.id===pendingAvatarId?' selected':''}"
+              onclick="selectAvatarCell('${a.id}',this)">
+           ${a.emoji}<span>${a.label}</span>
+         </div>`
+      ).join('');
+    }).catch(()=>{ grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--accent2);">Failed to load</div>'; });
+  }
 }
 
 function selectAvatarCell(id, el){
@@ -2193,8 +2201,8 @@ async function submitBugReport(){
         <strong id="pd-username">—</strong>
         <span class="pd-role user" id="pd-role">user</span>
       </div>
-      <div class="pd-item" onclick="openAvatarChange()">🎨 &nbsp;Change Avatar</div>
-      <div class="pd-item danger" onclick="doLogout()">⏏ &nbsp;Sign Out</div>
+      <button class="pd-item" onclick="openAvatarChange()">🎨 &nbsp;Change Avatar</button>
+      <button class="pd-item danger" onclick="doLogout()">⏏ &nbsp;Sign Out</button>
     </div>
   </div>
 </div>
