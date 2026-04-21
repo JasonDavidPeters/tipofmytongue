@@ -929,23 +929,15 @@ async function insertTracks(tracks, source) {
 
     const cleanArtist = realArtist.split(/[,&]/)[0].trim();
 
-    // 4. Get original release year
-    //    Step A: check KNOWN_YEARS table (instant — 768 hand-curated songs)
-    //    Step B: Deezer cross-reference — search for the original song recording
-    //            to get the real album release_date (not the karaoke upload date).
-    //            Fast (~100ms), same API, in-memory cached per ingest run.
+    // 4. Get year from KNOWN_YEARS table (instant — no API call)
+    //    We do NOT call lookupOriginalYear during ingest — it's slow (100ms per
+    //    track × thousands of tracks = minutes of delay). Instead we insert with
+    //    null decade and run fix-years in the background after ingest completes.
     let originalYear = knownYear(title, cleanArtist);
-    if (originalYear === null) {
-      originalYear = await lookupOriginalYear(title, cleanArtist);
-    }
 
-    // 5. Validate year against source's decade window
-    //    If we found a year (from KNOWN_YEARS or Deezer cross-ref), validate it
-    //    strictly against the source window. This catches misattributed songs
-    //    like "Balada para Adelina" (1977) appearing in Adele's playlist (2008+).
-    //    If year is null (Deezer karaoke tracks rarely have album dates), allow
-    //    the track through — the search query already scopes to the right artist.
-    //    We set decade=null which shows as "year unknown" on the reveal card.
+    // 5. Validate year only if we have one from KNOWN_YEARS
+    //    Songs not in the table get decade=null and are still playable.
+    //    The /api/admin/fix-years endpoint fills them in after ingest.
     if (originalYear !== null) {
       if (originalYear < source.decade_min || originalYear > source.decade_max) {
         rejected++; continue;
