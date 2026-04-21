@@ -434,6 +434,85 @@
     position: fixed; top: 16px; right: 16px; z-index: 9000;
   }
 
+
+  /* ── SETTINGS COG ─────────────────────────────────────────────────────────── */
+  #settings-btn {
+    position: fixed; bottom: 20px; right: 20px; z-index: 8000;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--muted); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  #settings-btn:hover { border-color: var(--accent); color: var(--accent); transform: rotate(30deg); }
+  #settings-btn.open  { border-color: var(--accent); color: var(--accent); transform: rotate(60deg); }
+
+  #settings-panel {
+    position: fixed; bottom: 74px; right: 20px; z-index: 8000;
+    background: var(--surface); border: 1px solid var(--border);
+    width: 260px; padding: 0;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    transform: translateY(10px) scale(0.97);
+    opacity: 0; pointer-events: none;
+    transition: all 0.18s cubic-bezier(0.16,1,0.3,1);
+    transform-origin: bottom right;
+  }
+  #settings-panel::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+  }
+  #settings-panel.open {
+    opacity: 1; pointer-events: all;
+    transform: translateY(0) scale(1);
+  }
+  .sp-header {
+    padding: 14px 16px 10px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px; letter-spacing: 2px; color: var(--accent);
+    border-bottom: 1px solid var(--border);
+  }
+  .sp-section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .sp-section:last-child { border-bottom: none; }
+  .sp-label {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin-bottom: 10px; display: block;
+  }
+  .sp-row { display: flex; align-items: center; gap: 10px; }
+  .sp-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+  .vol-slider {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 3px; background: var(--border); outline: none; border-radius: 2px;
+    cursor: pointer;
+  }
+  .vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+  .vol-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: none;
+  }
+  .vol-pct { font-size: 11px; color: var(--muted); width: 30px; text-align: right; font-family: 'Space Mono', monospace; }
+  .sp-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .sp-toggle {
+    width: 36px; height: 20px; background: var(--border); border-radius: 10px;
+    position: relative; cursor: pointer; transition: background 0.2s; border: none;
+    flex-shrink: 0;
+  }
+  .sp-toggle.on { background: var(--accent3); }
+  .sp-toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 14px; height: 14px; border-radius: 50%; background: white;
+    transition: left 0.2s;
+  }
+  .sp-toggle.on::after { left: 19px; }
+  /* Quit button — fixed bottom left in game */
+  #quit-btn {
+    position: fixed; bottom: 20px; left: 20px; z-index: 8000;
+    display: none;
+  }
+  #quit-btn.visible { display: flex; }
+
 </style>
 </head>
 <body>
@@ -586,7 +665,7 @@
   <div class="game-header">
     <div class="game-logo">🎵 TOYT</div>
     <div class="round-info"><strong id="h-round">1</strong>of <span id="h-total">10</span> rounds</div>
-    <button class="btn btn-secondary btn-sm" onclick="confirmQuit()">Quit</button>
+    <div style="width:60px"></div><!-- spacer to keep round-info centred -->
   </div>
   <div class="game-body">
     <div class="cp-area" id="cp-area"></div>
@@ -694,20 +773,18 @@ const G = {
 };
 
 let audio = null;
-function getAudio(){ if(!audio){audio=new Audio();audio.crossOrigin='anonymous';} return audio; }
+function getAudio(){ if(!audio){audio=new Audio();} return audio; }
 async function playUrl(url){
   const a = getAudio();
   a.src = url;
   a.currentTime = 0;
-  a.volume = 1.0;
+  a.volume = typeof gameVolume !== 'undefined' ? gameVolume : 0.8;
   try {
     await a.play();
-    // Hide tap-to-play button if it was showing
     const btn = document.getElementById('tap-to-play-btn');
     if (btn) btn.style.display = 'none';
   } catch(e) {
     console.warn('Autoplay blocked:', e);
-    // Show a visible button the user can tap to start playback
     showTapToPlay(url);
   }
 }
@@ -736,6 +813,12 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   window.scrollTo(0,0);
+  // Menu music: play on home/setup/howto/results, stop during game
+  const musicScreens = ['home','setup','howto','results'];
+  if (musicScreens.includes(id)) startMenuMusic();
+  else stopMenuMusic();
+  // Quit button: only visible in game
+  updateQuitBtn();
 }
 
 let playerCount=1;
@@ -892,7 +975,7 @@ async function beginRound(){
   // Warm the Audio element synchronously (before any await) so the browser
   // keeps the user-gesture context alive for autoplay permission.
   const a = getAudio();
-  a.src = '';
+  a.load(); // touch the element synchronously to preserve gesture context
 
   let previewUrl=null;
   try{
@@ -1693,6 +1776,93 @@ document.addEventListener('keydown', e => {
   if (document.getElementById('form-login').style.display !== 'none') doLogin();
   else doRegister();
 });
+
+// ── Settings & menu music ──────────────────────────────────────────────────────
+let menuMusicOn = true;
+let gameVolume  = 0.8;
+let musicVolume = 0.3;
+
+function toggleSettings() {
+  const btn   = document.getElementById('settings-btn');
+  const panel = document.getElementById('settings-panel');
+  const open  = panel.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+
+// Close settings when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#settings-panel') && !e.target.closest('#settings-btn')) {
+    document.getElementById('settings-panel').classList.remove('open');
+    document.getElementById('settings-btn').classList.remove('open');
+  }
+});
+
+function setGameVolume(val) {
+  gameVolume = val / 100;
+  document.getElementById('vol-game-pct').textContent = val + '%';
+  if (audio) audio.volume = gameVolume;
+  localStorage.setItem('toyt_game_vol', val);
+}
+
+function setMusicVolume(val) {
+  musicVolume = val / 100;
+  document.getElementById('vol-music-pct').textContent = val + '%';
+  const m = document.getElementById('menu-music');
+  if (m) m.volume = musicVolume;
+  localStorage.setItem('toyt_music_vol', val);
+}
+
+function toggleMenuMusic() {
+  menuMusicOn = !menuMusicOn;
+  const btn = document.getElementById('music-toggle');
+  btn.classList.toggle('on', menuMusicOn);
+  const m = document.getElementById('menu-music');
+  if (menuMusicOn) { m.volume = musicVolume; m.play().catch(() => {}); }
+  else              { m.pause(); }
+  localStorage.setItem('toyt_music_on', menuMusicOn ? '1' : '0');
+}
+
+function startMenuMusic() {
+  const m = document.getElementById('menu-music');
+  if (!m || !menuMusicOn) return;
+  m.volume = musicVolume;
+  m.play().catch(() => {}); // silently fail if autoplay blocked
+}
+
+function stopMenuMusic() {
+  const m = document.getElementById('menu-music');
+  if (m) { m.pause(); m.currentTime = 0; }
+}
+
+// Show/hide quit button based on active screen
+function updateQuitBtn() {
+  const btn = document.getElementById('quit-btn');
+  const gameActive = document.getElementById('screen-game').classList.contains('active');
+  btn.classList.toggle('visible', gameActive);
+}
+
+// Load saved settings
+(function loadSettings() {
+  const gv = localStorage.getItem('toyt_game_vol');
+  const mv = localStorage.getItem('toyt_music_vol');
+  const mo = localStorage.getItem('toyt_music_on');
+  if (gv !== null) {
+    gameVolume = parseInt(gv) / 100;
+    const slider = document.getElementById('vol-game');
+    if (slider) { slider.value = gv; document.getElementById('vol-game-pct').textContent = gv + '%'; }
+  }
+  if (mv !== null) {
+    musicVolume = parseInt(mv) / 100;
+    const slider = document.getElementById('vol-music');
+    if (slider) { slider.value = mv; document.getElementById('vol-music-pct').textContent = mv + '%'; }
+  }
+  if (mo === '0') {
+    menuMusicOn = false;
+    const btn = document.getElementById('music-toggle');
+    if (btn) btn.classList.remove('on');
+  }
+})();
+
 </script>
 
 <!-- AUTH MODAL -->
@@ -1758,6 +1928,50 @@ document.addEventListener('keydown', e => {
     </div>
   </div>
 </div>
+
+
+<!-- SETTINGS COG BUTTON -->
+<button id="settings-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+
+<!-- SETTINGS PANEL -->
+<div id="settings-panel">
+  <div class="sp-header">⚙ Settings</div>
+
+  <div class="sp-section">
+    <span class="sp-label">Game Volume</span>
+    <div class="sp-row">
+      <span class="sp-icon">🔊</span>
+      <input type="range" class="vol-slider" id="vol-game" min="0" max="100" value="80"
+             oninput="setGameVolume(this.value)">
+      <span class="vol-pct" id="vol-game-pct">80%</span>
+    </div>
+  </div>
+
+  <div class="sp-section">
+    <span class="sp-label">Menu Music</span>
+    <div class="sp-toggle-row">
+      <div class="sp-row">
+        <span class="sp-icon">🎶</span>
+        <span style="font-size:13px;color:var(--text);">Background Music</span>
+      </div>
+      <button class="sp-toggle on" id="music-toggle" onclick="toggleMenuMusic()"></button>
+    </div>
+    <div class="sp-row" style="margin-top:10px;">
+      <span class="sp-icon">🔉</span>
+      <input type="range" class="vol-slider" id="vol-music" min="0" max="100" value="30"
+             oninput="setMusicVolume(this.value)">
+      <span class="vol-pct" id="vol-music-pct">30%</span>
+    </div>
+  </div>
+</div>
+
+<!-- QUIT BUTTON (game screen only) -->
+<button class="btn btn-secondary btn-sm" id="quit-btn" onclick="confirmQuit()">✕ Quit</button>
+
+<!-- MENU MUSIC -->
+<audio id="menu-music" loop preload="none">
+  <source src="https://soundimage.org/wp-content/uploads/2016/10/Arcade-Fantasy.mp3" type="audio/mpeg">
+</audio>
 
 </body>
 </html>
