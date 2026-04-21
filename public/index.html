@@ -695,7 +695,41 @@ const G = {
 
 let audio = null;
 function getAudio(){ if(!audio){audio=new Audio();audio.crossOrigin='anonymous';} return audio; }
-async function playUrl(url){ const a=getAudio(); a.src=url; a.currentTime=0; try{await a.play();}catch(e){console.warn('Autoplay:',e);} }
+async function playUrl(url){
+  const a = getAudio();
+  a.src = url;
+  a.currentTime = 0;
+  a.volume = 1.0;
+  try {
+    await a.play();
+    // Hide tap-to-play button if it was showing
+    const btn = document.getElementById('tap-to-play-btn');
+    if (btn) btn.style.display = 'none';
+  } catch(e) {
+    console.warn('Autoplay blocked:', e);
+    // Show a visible button the user can tap to start playback
+    showTapToPlay(url);
+  }
+}
+
+function showTapToPlay(url) {
+  let btn = document.getElementById('tap-to-play-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'tap-to-play-btn';
+    btn.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;padding:20px 40px;font-size:20px;font-family:"Bebas Neue",sans-serif;letter-spacing:2px;background:var(--accent);color:#080b10;border:none;cursor:pointer;';
+    document.body.appendChild(btn);
+  }
+  btn.textContent = '▶ TAP TO PLAY';
+  btn.style.display = 'block';
+  btn.onclick = async () => {
+    btn.style.display = 'none';
+    const a = getAudio();
+    a.src = url;
+    a.currentTime = 0;
+    try { await a.play(); } catch(e) { console.error('Play failed:', e); }
+  };
+}
 function stopAudio(){ if(audio){audio.pause();audio.src='';audio.onended=null;} }
 
 function showScreen(id){
