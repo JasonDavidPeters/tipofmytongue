@@ -758,6 +758,11 @@
 
 <script>
 console.log("TOYT v4.2 loaded - " + new Date().toISOString());
+
+// Settings state — declared at top to avoid TDZ errors
+let menuMusicOn = true;
+let gameVolume  = 0.8;
+let musicVolume = 0.3;
 // strict mode removed — prevents total script death on any error
 
 const G = {
@@ -1802,9 +1807,6 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Settings & menu music ──────────────────────────────────────────────────────
-let menuMusicOn = true;
-let gameVolume  = 0.8;
-let musicVolume = 0.3;
 
 function toggleSettings() {
   const btn   = document.getElementById('settings-btn');
