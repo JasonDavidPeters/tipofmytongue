@@ -1904,12 +1904,22 @@ async function doLogout() {
 // ── Change avatar (inline prompt for MVP) ────────────────────────────────────
 let pendingAvatarId = null;
 
-function openAvatarChange() {
+async function openAvatarChange() {
   document.getElementById('profile-dropdown').classList.remove('open');
-  if (!availableAvatars.length) return;
+  if (!currentUser) { showToast('Please sign in to change your avatar', 'error'); return; }
+  // Fetch avatars if not yet loaded
+  if (!availableAvatars.length) {
+    try {
+      const r = await fetch('/api/auth/avatars');
+      const d = await r.json();
+      availableAvatars = d.avatars || [];
+    } catch(e) { /* ignore */ }
+  }
+  if (!availableAvatars.length) { showToast('Could not load avatars', 'error'); return; }
   // Build avatar grid
-  pendingAvatarId = currentUser ? currentUser.avatar : null;
+  pendingAvatarId = currentUser.avatar || null;
   const grid = document.getElementById('avatar-change-grid');
+  if (!grid) { console.error('avatar-change-grid element not found'); return; }
   grid.innerHTML = availableAvatars.map(a =>
     `<div class="avatar-cell${a.id===pendingAvatarId?' selected':''}"
           onclick="selectAvatarCell('${a.id}',this)">
@@ -2058,12 +2068,10 @@ function updateQuitBtn() {
 function loadSettings() {
   const volGame  = document.getElementById('vol-game');
   const volMusic = document.getElementById('vol-music');
-  const musBtn   = document.getElementById('music-toggle');
 
   // Wire via addEventListener — more reliable than inline handlers
   if (volGame)  volGame.addEventListener('input', function() { setGameVolume(this.value); });
   if (volMusic) volMusic.addEventListener('input', function() { setMusicVolume(this.value); });
-  if (musBtn)   musBtn.addEventListener('click', toggleMenuMusic);
 
   // Restore game volume
   const gv = localStorage.getItem('toyt_game_vol');
@@ -2089,11 +2097,7 @@ function loadSettings() {
     const b = document.getElementById('mute-music-btn');
     if (b) { b.textContent = '🔇'; b.classList.add('muted'); }
   }
-  // Restore menu music on/off
-  if (localStorage.getItem('toyt_music_on') === '0') {
-    menuMusicOn = false;
-    if (musBtn) musBtn.classList.remove('on');
-  }
+
 };
 
 
@@ -2214,14 +2218,7 @@ async function submitBugReport(){
 
   <div class="sp-section">
     <span class="sp-label">Menu Music</span>
-    <div class="sp-toggle-row">
-      <div class="sp-row">
-        <span class="sp-icon">🎶</span>
-        <span style="font-size:13px;color:var(--text);">Background Music</span>
-      </div>
-      <button class="sp-toggle on" id="music-toggle"></button>
-    </div>
-    <div class="sp-row" style="margin-top:10px;">
+    <div class="sp-row">
       <button class="sp-mute-btn" id="mute-music-btn" title="Toggle mute" onclick="toggleMusicMute()">🔉</button>
       <input type="range" class="vol-slider" id="vol-music" min="0" max="100" value="30">
       <span class="vol-pct" id="vol-music-pct">30%</span>
