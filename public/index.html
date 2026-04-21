@@ -1547,12 +1547,15 @@ function initHomeAnimations() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  loadSettings();   // restore volume/music prefs from localStorage (DOM now exists)
   // initAuth must complete first so currentUser is set before renderPlayers runs
   initAuth()
     .catch(e => console.warn('initAuth failed:', e))
-    .finally(() => renderPlayers()); // now currentUser is known
+    .finally(() => renderPlayers());
   initTestingMode().catch(e => console.warn('initTestingMode failed:', e));
   initHomeAnimations();
+  startMenuMusic();  // start menu music after first interaction isn't needed here —
+                     // autoplay will be blocked but that's fine, it starts on first click
 });
 
 // ── Auth state ────────────────────────────────────────────────────────────────
@@ -1815,10 +1818,13 @@ function setMusicVolume(val) {
 function toggleMenuMusic() {
   menuMusicOn = !menuMusicOn;
   const btn = document.getElementById('music-toggle');
-  btn.classList.toggle('on', menuMusicOn);
+  if (menuMusicOn) btn.classList.add('on');
+  else             btn.classList.remove('on');
   const m = document.getElementById('menu-music');
-  if (menuMusicOn) { m.volume = musicVolume; m.play().catch(() => {}); }
-  else              { m.pause(); }
+  if (m) {
+    if (menuMusicOn) { m.volume = musicVolume; m.play().catch(() => {}); }
+    else             { m.pause(); }
+  }
   localStorage.setItem('toyt_music_on', menuMusicOn ? '1' : '0');
 }
 
@@ -1826,7 +1832,18 @@ function startMenuMusic() {
   const m = document.getElementById('menu-music');
   if (!m || !menuMusicOn) return;
   m.volume = musicVolume;
-  m.play().catch(() => {}); // silently fail if autoplay blocked
+  // Only try to play if we're not already playing
+  if (!m.paused) return;
+  m.play().catch(() => {
+    // Autoplay blocked — attach a one-time listener to start on next interaction
+    const resume = () => {
+      if (menuMusicOn) m.play().catch(() => {});
+      document.removeEventListener('click', resume);
+      document.removeEventListener('keydown', resume);
+    };
+    document.addEventListener('click', resume, { once: true });
+    document.addEventListener('keydown', resume, { once: true });
+  });
 }
 
 function stopMenuMusic() {
@@ -1842,7 +1859,7 @@ function updateQuitBtn() {
 }
 
 // Load saved settings
-(function loadSettings() {
+function loadSettings() {
   const gv = localStorage.getItem('toyt_game_vol');
   const mv = localStorage.getItem('toyt_music_vol');
   const mo = localStorage.getItem('toyt_music_on');
@@ -1861,7 +1878,7 @@ function updateQuitBtn() {
     const btn = document.getElementById('music-toggle');
     if (btn) btn.classList.remove('on');
   }
-})();
+};
 
 </script>
 
