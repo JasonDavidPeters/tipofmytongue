@@ -514,6 +514,30 @@
   }
   #quit-btn.visible { display: flex; }
 
+
+  /* LAST ROUND REVEAL */
+  #screen-lastround { gap:28px; justify-content:center; }
+  .lr-eyebrow { font-size:11px; letter-spacing:4px; text-transform:uppercase; color:var(--muted); }
+  .lr-card { background:var(--surface); border:1px solid var(--border); padding:32px 40px; text-align:center; max-width:480px; width:100%; }
+  .lr-card::before { content:''; display:block; width:40px; height:2px; background:var(--accent); margin:0 auto 20px; }
+  .lr-title  { font-family:'Bebas Neue',sans-serif; font-size:42px; color:var(--accent); line-height:1.1; }
+  .lr-artist { font-size:18px; color:var(--text); margin-top:6px; }
+  .lr-year   { font-size:13px; color:var(--muted); margin-top:8px; letter-spacing:1px; }
+  .lr-actions { display:flex; flex-direction:column; gap:10px; width:100%; max-width:320px; }
+
+  /* BUG REPORT */
+  #screen-bugreport { gap:24px; }
+  .br-card { background:var(--surface); border:1px solid var(--border); padding:28px; max-width:540px; width:100%; display:flex; flex-direction:column; gap:16px; }
+  .br-input, .br-textarea {
+    width:100%; background:var(--surface2); border:1px solid var(--border);
+    color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px;
+    padding:12px 14px; outline:none; resize:none; box-sizing:border-box;
+    transition:border-color 0.2s;
+  }
+  .br-input:focus, .br-textarea:focus { border-color:var(--accent); }
+  .br-textarea { min-height:140px; line-height:1.6; }
+  .br-note { font-size:12px; color:var(--muted); line-height:1.5; }
+
 </style>
 </head>
 <body>
@@ -549,9 +573,50 @@
     <p class="home-tagline">15 seconds. One instrumental.<br>How fast can you name it?</p>
 
     <div class="home-menu">
-      <button class="btn btn-primary" onclick="showSetup()">▶ &nbsp;Play Now</button>
+      <button class="btn btn-primary"   onclick="showSetup()">▶ &nbsp;Play Now</button>
       <button class="btn btn-secondary" onclick="showScreen('howto')">? &nbsp;How to Play</button>
+      <button class="btn btn-secondary" onclick="showScreen('bugreport')">🐛 &nbsp;Report a Bug</button>
     </div>
+  </div>
+</div>
+
+
+<!-- LAST ROUND REVEAL -->
+<div id="screen-lastround" class="screen">
+  <div class="lr-eyebrow">🎵 Final Song</div>
+  <div class="lr-card">
+    <div class="lr-eyebrow">The answer was</div>
+    <div class="lr-title"  id="lr-title">—</div>
+    <div class="lr-artist" id="lr-artist"></div>
+    <div class="lr-year"   id="lr-year"></div>
+  </div>
+  <div class="lr-actions">
+    <button class="btn btn-primary"   onclick="showResults()">🏆 See Scoreboard</button>
+    <button class="btn btn-secondary" onclick="replayGame()">↺ &nbsp;Play Again</button>
+    <button class="btn btn-secondary" onclick="showScreen('home')">⌂ &nbsp;Main Menu</button>
+  </div>
+</div>
+
+
+<!-- BUG REPORT -->
+<div id="screen-bugreport" class="screen">
+  <button class="back-btn" onclick="showScreen('home')">← Back</button>
+  <div class="logo" style="font-size:36px;text-align:center;margin-bottom:4px;">Report a Bug</div>
+  <div class="br-card">
+    <div class="form-group">
+      <label class="form-label">Bug Title <span style="color:var(--muted);font-size:10px;">(this becomes the email subject)</span></label>
+      <input  class="br-input" id="br-title" type="text" maxlength="80"
+              placeholder="e.g. Audio stops after round 3">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea class="br-textarea" id="br-body"
+                placeholder="Describe what happened, what you expected, and how to reproduce it…"></textarea>
+    </div>
+    <div class="br-note">
+      Clicking Send will open your email client with the report pre-filled and addressed to the TOYT team.
+    </div>
+    <button class="btn btn-primary" onclick="submitBugReport()">✉ &nbsp;Send Report</button>
   </div>
 </div>
 
@@ -835,8 +900,11 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   window.scrollTo(0,0);
-  // Menu music: play on home/setup/howto/results, stop during game
-  const musicScreens = ['home','setup','howto','results'];
+  // Always hide tap-to-play when changing screens
+  const ttp = document.getElementById('tap-to-play-btn');
+  if (ttp) ttp.style.display = 'none';
+  // Menu music: play on home/setup/howto/results/bugreport, stop during game
+  const musicScreens = ['home','setup','howto','results','lastround','bugreport'];
   if (musicScreens.includes(id)) startMenuMusic();
   else stopMenuMusic();
   // Quit button: only visible in game
@@ -946,6 +1014,7 @@ async function startGame(){
   G.currentSongIdx=0; G.currentPlayerIdx=0;
   G.mode=isArtistMode?'artist':'genre';
   G.lockedArtist=isArtistMode?artist:null;
+  G.era=era; G.genre=genre; // stored so replayGame can use same filters
   showScreen('game'); beginRound();
 }
 
@@ -957,19 +1026,31 @@ function setLoadUI(title, sub, pct){
 }
 
 async function replayGame(){
+  try { const a = getAudio(); a.src=''; a.load(); } catch(e) {} // unlock audio for Firefox
   showScreen('loading');
   setLoadUI('Shuffling…','Getting a fresh set of songs…',20);
   let songs;
   try{
     let url=`/api/songs?count=${G.totalRounds}`;
-    if(G.mode==='artist'&&G.lockedArtist) url+=`&artist=${encodeURIComponent(G.lockedArtist)}`;
-    else url+='&era=all';
+    if(G.mode==='artist'&&G.lockedArtist){
+      url+=`&artist=${encodeURIComponent(G.lockedArtist)}`;
+    } else {
+      // Preserve the era/genre from the original game
+      if(G.era  &&G.era  !=='all') url+=`&era=${encodeURIComponent(G.era)}`;
+      if(G.genre&&G.genre!=='all') url+=`&genre=${encodeURIComponent(G.genre)}`;
+    }
     const res=await fetch(url);
     const data=await res.json();
     songs=data.songs||G.songs;
-  } catch{ songs=G.songs; }
+    // Deduplicate same as startGame
+    const seen=new Set();
+    songs=songs.filter(s=>{
+      const norm=s.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+      if(seen.has(norm))return false; seen.add(norm); return true;
+    });
+  } catch(e){ console.warn('replayGame fetch failed:',e); songs=G.songs; }
   setLoadUI('Ready!','',100);
-  await new Promise(r=>setTimeout(r,500));
+  await new Promise(r=>setTimeout(r,400));
   G.scores=Object.fromEntries(G.players.map(p=>[p,0]));
   G.round=1; G.songs=songs; G.currentSongIdx=0; G.currentPlayerIdx=0;
   showScreen('game'); beginRound();
@@ -1094,7 +1175,7 @@ function nextRound(){
   try { const a = getAudio(); a.load(); } catch(e) {} // re-unlock for Firefox
   G.currentSongIdx++; G.round++;
   if(G.players.length>1) G.currentPlayerIdx=(G.currentPlayerIdx+1)%G.players.length;
-  if(G.currentSongIdx>=G.songs.length){showResults();return;}
+  if(G.currentSongIdx>=G.songs.length){showLastRound();return;}
   beginRound();
 }
 
@@ -1422,8 +1503,25 @@ function updateScoreboard(hl=null,delta=0){
 }
 
 // ── Results ───────────────────────────────────────────────────────────────────
+function showLastRound(){
+  // Stop game audio immediately — don't play over menu music
+  stopAudio();
+  const ttp = document.getElementById('tap-to-play-btn');
+  if (ttp) ttp.style.display = 'none';
+  // Show the last song's reveal card on the dedicated last-round screen
+  const song = G.songs[G.currentSongIdx - 1]; // we already incremented
+  const yearStr = song && song.decade ? song.decade : null;
+  document.getElementById('lr-title').textContent  = song ? song.title  : '—';
+  document.getElementById('lr-artist').textContent = song ? 'by ' + song.artist : '';
+  document.getElementById('lr-year').textContent   = yearStr ? '📅 Originally released: ' + yearStr : '';
+  showScreen('lastround');
+}
+
 function showResults(){
-  stopAudio(); showScreen('results');
+  stopAudio();
+  const ttp = document.getElementById('tap-to-play-btn');
+  if (ttp) ttp.style.display = 'none';
+  showScreen('results');
   const sorted=[...G.players].sort((a,b)=>G.scores[b]-G.scores[a]);
   const podium=document.getElementById('podium');
   if(sorted.length===1){
@@ -1913,6 +2011,25 @@ function loadSettings() {
     if (musBtn) musBtn.classList.remove('on');
   }
 };
+
+
+function submitBugReport(){
+  const title = (document.getElementById('br-title').value||'').trim();
+  const body  = (document.getElementById('br-body').value||'').trim();
+  if(!title){ showToast('Please add a bug title','error'); return; }
+  if(!body) { showToast('Please describe the bug','error'); return; }
+  const to      = 'bugs@tipofmytongue.app';
+  const subject = encodeURIComponent('[TOYT Bug] ' + title);
+  const bodyEnc = encodeURIComponent(body + '\n\n---\nSubmitted from TOYT v4.2');
+  window.location.href = `mailto:${to}?subject=${subject}&body=${bodyEnc}`;
+  // Clear fields after sending
+  setTimeout(()=>{
+    document.getElementById('br-title').value='';
+    document.getElementById('br-body').value='';
+    showScreen('home');
+    showToast('Opening your email client…','success');
+  }, 500);
+}
 
 </script>
 
