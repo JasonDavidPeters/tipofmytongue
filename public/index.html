@@ -915,17 +915,15 @@ let audio = null;
 function getAudio(){ if(!audio){audio=new Audio();} return audio; }
 async function playUrl(url){
   const a = getAudio();
-  a.onerror = null;
   a.src = url;
   a.volume = (gameMuted || typeof gameVolume === 'undefined') ? 0 : gameVolume;
-  a.onerror = (e) => console.error('[audio] Load error:', e);
-  // .load() is required in Firefox before .play() when src changes
-  a.load();
-  console.log('[audio] Playing:', url.slice(0,60));
+  a.onerror = (e) => console.error('[audio] error:', e.type, url.slice(0,50));
+  console.log('[audio] play →', url.slice(0,60));
   try {
     await a.play();
+    console.log('[audio] playing ok');
   } catch(e) {
-    console.warn('[audio] play() blocked or failed:', e.name, e.message);
+    console.warn('[audio] failed:', e.name, e.message);
   }
 }
 
@@ -994,8 +992,7 @@ function onArtistChange(){
 
 // ── Start game ────────────────────────────────────────────────────────────────
 async function startGame(){
-  // Unlock audio during user gesture — Firefox requires this
-  try { const a = getAudio(); a.src=''; a.load(); } catch(e) {}
+  // Audio element warmed by previous play() call — no extra unlock needed
   const players=Array.from({length:playerCount},(_,i)=>document.getElementById(`pn${i}`)?.value.trim()||DN[i]);
   const rounds=parseInt(document.getElementById('rounds-select').value);
   const era=document.getElementById('era-select').value;
@@ -1004,7 +1001,7 @@ async function startGame(){
   const isArtistMode=artist!=='all';
 
   showScreen('loading');
-  setLoadUI(isArtistMode?`${artist} — Artist Mode`:'Setting the Stage','Selecting songs & checking previews…',10);
+  setLoadUI(isArtistMode?`${artist} — Artist Mode`:'Setting the Stage','Picking your songs…',10);
 
   let songs;
   try{
@@ -1051,7 +1048,7 @@ function setLoadUI(title, sub, pct){
 }
 
 async function replayGame(){
-  try { const a = getAudio(); a.src=''; a.load(); } catch(e) {} // unlock audio for Firefox
+
   showScreen('loading');
   setLoadUI('Shuffling…','Getting a fresh set of songs…',20);
   let songs;
@@ -1090,10 +1087,17 @@ async function beginRound(){
   setTimerUI(20,20); setVinyl('loading'); setStatus('load','⏳ Loading instrumental…');
   updateScoreboard();
 
-  // Preview URL was resolved server-side at game start — play immediately
-  const previewUrl = song.previewUrl;
+  // Fetch preview URL fresh from the browser — Deezer CDN URLs are IP-bound
+  // so they must be resolved from the user's browser, not the server.
+  let previewUrl = null;
+  try {
+    const res = await fetch(`/api/preview?id=${song.id}`);
+    const data = await res.json();
+    previewUrl = data.previewUrl;
+  } catch(e) { console.error('[beginRound] preview fetch error:', e); }
+
   if(!previewUrl){
-    // Fallback: skip this song silently (shouldn't happen with new game-start endpoint)
+    // Skip this song silently — move to next without counting as a round
     G.currentSongIdx++;
     if(G.currentSongIdx>=G.songs.length){ showResults(); return; }
     beginRound(); return;
@@ -1174,7 +1178,7 @@ function endRound(){
 }
 
 function nextRound(){
-  try { const a = getAudio(); a.load(); } catch(e) {} // re-unlock for Firefox
+
   G.currentSongIdx++; G.round++;
   if(G.players.length>1) G.currentPlayerIdx=(G.currentPlayerIdx+1)%G.players.length;
   if(G.currentSongIdx>=G.songs.length){showLastRound();return;}
@@ -1996,7 +2000,15 @@ function toggleMusicMute() {
   const btn = document.getElementById('mute-music-btn');
   if (btn) { btn.textContent = musicMuted ? '🔇' : '🔉'; btn.classList.toggle('muted', musicMuted); }
   const m = document.getElementById('menu-music');
-  if (m) m.volume = musicMuted ? 0 : musicVolume;
+  if (m) {
+    if (musicMuted) {
+      m.volume = 0;
+    } else {
+      m.volume = musicVolume;
+      // Resume if it was playing before mute
+      if (menuMusicOn && m.paused) m.play().catch(() => {});
+    }
+  }
   localStorage.setItem('toyt_music_muted', musicMuted ? '1' : '0');
 }
 
@@ -2016,13 +2028,12 @@ function toggleMenuMusic() {
 function startMenuMusic() {
   const m = document.getElementById('menu-music');
   if (!m || !menuMusicOn) return;
-  m.volume = musicVolume;
-  // Only try to play if we're not already playing
-  if (!m.paused) return;
+  // Respect mute state — set volume accordingly
+  m.volume = musicMuted ? 0 : musicVolume;
+  if (!m.paused) return; // already playing
   m.play().catch(() => {
-    // Autoplay blocked — attach a one-time listener to start on next interaction
     const resume = () => {
-      if (menuMusicOn) m.play().catch(() => {});
+      if (menuMusicOn) { m.volume = musicMuted ? 0 : musicVolume; m.play().catch(() => {}); }
       document.removeEventListener('click', resume);
       document.removeEventListener('keydown', resume);
     };
@@ -2159,7 +2170,7 @@ async function submitBugReport(){
       </div>
       <div class="form-group">
         <label class="form-label">Choose Your Avatar</label>
-        <div class="avatar-grid" id="avatar-change-grid"></div>
+        <div class="avatar-grid" id="avatar-grid"></div>
       </div>
       <button class="btn btn-primary w-full" onclick="doRegister()">Create Account →</button>
     </div>
@@ -2243,7 +2254,7 @@ async function submitBugReport(){
 <div class="game-overlay" id="avatar-overlay">
   <div class="game-overlay-box" style="max-width:480px;">
     <div class="game-overlay-title">Choose Avatar</div>
-    <div class="avatar-grid" id="avatar-grid"></div>
+    <div class="avatar-grid" id="avatar-change-grid"></div>
     <div class="game-overlay-actions">
       <button class="btn btn-primary"   id="avatar-confirm-btn" onclick="confirmAvatarChange()">✓ &nbsp;Save Avatar</button>
       <button class="btn btn-secondary" onclick="closeOverlay('avatar-overlay')">Cancel</button>
