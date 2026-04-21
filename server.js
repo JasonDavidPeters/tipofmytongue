@@ -102,7 +102,108 @@ app.get('/api/songs', async (req, res) => {
   }
 });
 
-// ─── GET /api/preview?id=<songId> ────────────────────────────────────────────
+// ─── POST /api/game-start ─────────────────────────────────────────────────────
+// Selects songs AND resolves all Deezer preview URLs server-side.
+// Returns {songs: [{id,title,artist,era,genre,decade,previewUrl}]}
+// Preview URLs never appear in client HTML source — only received at game time.
+app.post('/api/game-start', async (req, res) => {
+  const { count = 10, era = 'all', genre = 'all', artist = 'all' } = req.body || {};
+
+  // ── Step 1: Select songs (same logic as /api/songs) ──────────────────────
+  const conditions = ['enabled = true'];
+  const params = [];
+
+  if (artist !== 'all') {
+    params.push(artist.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim());
+    conditions.push(`regexp_replace(lower(artist), '[^a-z0-9 ]', ' ', 'g') = $${params.length}`);
+  } else {
+    if (era   !== 'all') { params.push(era);   conditions.push(`era = $${params.length}`); }
+    if (genre !== 'all') { params.push(genre); conditions.push(`genre = $${params.length}`); }
+  }
+
+  const where = conditions.join(' AND ');
+  // Fetch 3x the requested count so we have spares after preview filtering
+  const fetchCount = Math.min(parseInt(count) * 3, 300);
+  params.push(fetchCount);
+
+  let candidates;
+  try {
+    const result = await pool.query(
+      `SELECT id, title, artist, era, genre, decade, deezer_query
+       FROM songs WHERE ${where} ORDER BY RANDOM() LIMIT $${params.length}`,
+      params
+    );
+    candidates = result.rows;
+    if (!candidates.length) {
+      return res.status(404).json({ error: 'No songs found for these filters' });
+    }
+  } catch (err) {
+    console.error('[/api/game-start] DB:', err.message);
+    return res.status(500).json({ error: 'Database error' });
+  }
+
+  // ── Step 2: Deduplicate by normalised title ───────────────────────────────
+  const seenTitles = new Set();
+  candidates = candidates.filter(s => {
+    const norm = s.title.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (seenTitles.has(norm)) return false;
+    seenTitles.add(norm);
+    return true;
+  });
+
+  // ── Step 3: Resolve preview URLs in parallel (capped concurrency) ─────────
+  const needed = parseInt(count);
+  const resolvedSongs = [];
+
+  // Process in batches of 5 to avoid hammering Deezer
+  for (let i = 0; i < candidates.length && resolvedSongs.length < needed; i += 5) {
+    const batch = candidates.slice(i, i + 5);
+    const results = await Promise.all(batch.map(async song => {
+      const queries = [
+        song.deezer_query,
+        `${song.title} "${song.artist}" karaoke`,
+        `${song.title} "${song.artist}" instrumental`,
+        `"${song.artist}" ${song.title} karaoke instrumental`,
+        `${song.title} karaoke instrumental`,
+        `${song.title} karaoke`,
+      ];
+      for (const q of queries) {
+        try {
+          const r = await fetch(
+            `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=50`,
+            { signal: AbortSignal.timeout(8000) }
+          );
+          if (!r.ok) continue;
+          const data = await r.json();
+          for (const t of (data.data || [])) {
+            if (t.preview && isInstrumental(t)) {
+              // t.link is the karaoke track page — we build a search URL for the
+              // original song instead so users find the real recording
+              const deezerLink = `https://www.deezer.com/search/${encodeURIComponent(song.title + ' ' + song.artist)}`;
+              return { ...song, previewUrl: t.preview, deezerLink };
+            }
+          }
+        } catch (e) { /* try next query */ }
+      }
+      console.warn(`[game-start] No preview: ${song.title} — ${song.artist}`);
+      return null; // no preview found
+    }));
+
+    for (const s of results) {
+      if (s && resolvedSongs.length < needed) resolvedSongs.push(s);
+    }
+  }
+
+  if (!resolvedSongs.length) {
+    return res.status(503).json({ error: 'Could not find any playable songs — try again' });
+  }
+
+  // Strip deezer_query before sending to client (internal field)
+  const clientSongs = resolvedSongs.map(({ deezer_query, ...rest }) => rest);
+  res.json({ songs: clientSongs, total: clientSongs.length });
+});
+
+// ─── GET /api/preview?id=<songId> ─────────────────────────────────────────────
 // ALWAYS fetches a fresh URL from Deezer. No caching of any kind.
 // Deezer CDN tokens expire in ~30 minutes — any cache will cause 403 errors.
 app.get('/api/preview', async (req, res) => {
@@ -548,7 +649,11 @@ const LOCKED_ARTISTS = [
   'Sam Smith', 'Shania Twain', 'Snoop Dogg', 'Spice Girls', 'SZA',
   'Taylor Swift', 'The Beatles', 'The Weeknd', 'TLC', 'Tupac', 'U2',
   'Usher', 'Van Halen', 'Warren G', 'Whitney Houston',
-].sort();
+].sort((a, b) => {
+  // Sort by effective name — strip leading "The " so "The Beatles" sorts under B
+  const key = n => n.toLowerCase().replace(/^the\s+/i, '');
+  return key(a).localeCompare(key(b));
+});
 
 // ─── Testing mode flag ────────────────────────────────────────────────────────
 const TESTING = process.env.TESTING === 'true';
@@ -609,6 +714,71 @@ app.get('/api/admin/reset', async (req, res) => {
   } catch (err) {
     console.error('[reset] Failed:', err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// ─── POST /api/bug-report ─────────────────────────────────────────────────────
+// Sends a bug report email via Resend API.
+// Env vars needed:
+//   BUG_REPORT_TO   — recipient address (your email)
+//   BUG_REPORT_FROM — sender address (must be verified in Resend, e.g. bugs@yourdomain.com)
+//   RESEND_API_KEY  — API key from resend.com (free tier: 3000 emails/month)
+app.post('/api/bug-report', async (req, res) => {
+  const { title, body } = req.body || {};
+  if (!title || !body) {
+    return res.status(400).json({ error: 'Title and body are required' });
+  }
+
+  const to   = process.env.BUG_REPORT_TO;
+  const from = process.env.BUG_REPORT_FROM || 'bugs@tipofmytongue.app';
+  const key  = process.env.RESEND_API_KEY;
+
+  if (!to || !key) {
+    console.warn('[bug-report] BUG_REPORT_TO or RESEND_API_KEY not set — logging report instead');
+    console.log('[bug-report]', { title, body: body.slice(0, 200) });
+    return res.json({ ok: true, method: 'logged' });
+  }
+
+  try {
+    const payload = JSON.stringify({
+      from,
+      to,
+      subject: '[TOYT Bug] ' + title,
+      text: body + '\n\n---\nSubmitted via tipofmytongue.app',
+    });
+
+    const result = await new Promise((resolve, reject) => {
+      const https = require('https');
+      const opts = {
+        hostname: 'api.resend.com',
+        path: '/emails',
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + key,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      };
+      const reqH = https.request(opts, r => {
+        let data = '';
+        r.on('data', d => data += d);
+        r.on('end', () => resolve({ status: r.statusCode, body: data }));
+      });
+      reqH.on('error', reject);
+      reqH.write(payload);
+      reqH.end();
+    });
+
+    if (result.status === 200 || result.status === 201) {
+      res.json({ ok: true });
+    } else {
+      console.error('[bug-report] Resend error:', result.body);
+      res.status(500).json({ error: 'Email delivery failed' });
+    }
+  } catch (err) {
+    console.error('[bug-report] Request failed:', err.message);
+    res.status(500).json({ error: 'Failed to send report' });
   }
 });
 
