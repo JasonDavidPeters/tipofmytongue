@@ -947,7 +947,10 @@ async function insertTracks(tracks, source) {
     const era          = source.era;
     const genre        = source.genre;
     const decade       = originalYear;
-    const deezerQuery  = '"' + title + '" "' + cleanArtist + '" instrumental karaoke';
+    // Don't quote the title — karaoke tracks append publisher info to titles
+    // e.g. "Fix You (By Coldplay) (Instrumental)" won't match '"Fix You"' exactly.
+    // Quote the artist name to anchor it, leave title loose for Deezer to fuzzy-match.
+    const deezerQuery  = title + ' "' + cleanArtist + '" karaoke instrumental';
 
     try {
       const result = await pool.query(

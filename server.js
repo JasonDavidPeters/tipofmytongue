@@ -124,14 +124,16 @@ app.get('/api/preview', async (req, res) => {
   }
 
   // Fresh Deezer search — try progressively broader queries.
-  // We search for the instrumental/karaoke version of the specific song.
-  // The artist name from deezer_query is the real artist (not the publisher).
+  // Karaoke track titles on Deezer include publisher suffixes like
+  // "(By Coldplay) (Instrumental Karaoke Version)" so we DON'T quote the title.
+  // We anchor by artist name (quoted) and add karaoke/instrumental keywords.
   const queries = [
-    song.deezer_query,                                                        // e.g. '"Magic" "Coldplay" instrumental karaoke'
-    `"${song.title}" "${song.artist}" karaoke`,
-    `"${song.title}" "${song.artist}" instrumental`,
-    `"${song.title}" karaoke instrumental`,                                   // drop artist — wider net
-    `${song.title} karaoke`,                                                  // broadest — title only
+    song.deezer_query,                                                        // stored query from ingest
+    `${song.title} "${song.artist}" karaoke`,                                 // unquoted title, quoted artist
+    `${song.title} "${song.artist}" instrumental`,
+    `"${song.artist}" ${song.title} karaoke instrumental`,                    // artist first
+    `${song.title} karaoke instrumental`,                                     // drop artist entirely
+    `${song.title} karaoke`,                                                  // broadest
   ];
 
   let previewUrl = null;
