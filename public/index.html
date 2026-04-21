@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tip of Your Tongue — Music Trivia</title>
+<!-- TOYT BUILD v4.1 -->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="alternate icon" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/favicon.svg">
@@ -437,12 +438,12 @@
 
   /* ── SETTINGS COG ─────────────────────────────────────────────────────────── */
   #settings-btn {
-    position: fixed; bottom: 20px; right: 20px; z-index: 8000;
-    width: 44px; height: 44px; border-radius: 50%;
-    background: var(--surface); border: 1px solid var(--border);
-    color: var(--muted); font-size: 20px; cursor: pointer;
+    position: fixed; bottom: 22px; right: 22px; z-index: 8000;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--border);
+    color: var(--muted); font-size: 26px; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    transition: all 0.2s; box-shadow: 0 4px 24px rgba(0,0,0,0.5);
   }
   #settings-btn:hover { border-color: var(--accent); color: var(--accent); transform: rotate(30deg); }
   #settings-btn.open  { border-color: var(--accent); color: var(--accent); transform: rotate(60deg); }
@@ -508,8 +509,8 @@
   .sp-toggle.on::after { left: 19px; }
   /* Quit button — fixed bottom left in game */
   #quit-btn {
-    position: fixed; bottom: 20px; left: 20px; z-index: 8000;
-    display: none;
+    position: fixed; bottom: 22px; left: 22px; z-index: 8000;
+    display: none; padding: 14px 24px; font-size: 15px;
   }
   #quit-btn.visible { display: flex; }
 
@@ -756,7 +757,7 @@
 </div>
 
 <script>
-'use strict';
+// strict mode removed — prevents total script death on any error
 
 const G = {
   players:[], scores:{}, currentPlayerIdx:0,
@@ -998,10 +999,10 @@ async function beginRound(){
   }
 
   setVinyl('playing'); setStatus('play','▶ Now playing — name this song!');
-  await playUrl(previewUrl);
   G.roundStartTime=Date.now(); G.active=true;
   startTimer();
   getAudio().onended=()=>{ if(G.active) timeUp(); };
+  await playUrl(previewUrl);
 }
 
 function startTimer(){
