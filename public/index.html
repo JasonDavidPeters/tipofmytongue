@@ -891,11 +891,12 @@
 console.log("TOYT v4.2 loaded - " + new Date().toISOString());
 
 // Settings state — declared at top to avoid TDZ errors
-let menuMusicOn = true;
-let gameVolume  = 0.8;
-let musicVolume = 0.3;
-let gameMuted   = false;
-let musicMuted  = false;
+let menuMusicOn    = true;
+let gameVolume     = 0.8;
+let musicVolume    = 0.3;
+let gameMuted      = false;
+let musicMuted     = false;
+let pendingAvatarId = null;
 // strict mode removed — prevents total script death on any error
 
 const G = {
@@ -1814,9 +1815,12 @@ function clearAuthError() {
   if (el) el.classList.remove('show');
 }
 
-// Close modal on overlay click
-document.getElementById('auth-modal').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeAuthModal();
+// Close modal on overlay click — must be inside DOMContentLoaded (element may not exist yet)
+document.addEventListener('DOMContentLoaded', () => {
+  const authModal = document.getElementById('auth-modal');
+  if (authModal) authModal.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeAuthModal();
+  });
 });
 
 // ── Avatar grid ───────────────────────────────────────────────────────────────
@@ -1903,8 +1907,6 @@ async function doLogout() {
 }
 
 // ── Change avatar (inline prompt for MVP) ────────────────────────────────────
-let pendingAvatarId = null;
-
 function openAvatarChange() {
   console.log('[avatar] openAvatarChange called, currentUser:', currentUser, 'avatars:', availableAvatars.length);
   document.getElementById('profile-dropdown').classList.remove('open');
