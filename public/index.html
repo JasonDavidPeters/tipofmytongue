@@ -893,6 +893,8 @@ console.log("TOYT v4.2 loaded - " + new Date().toISOString());
 let menuMusicOn = true;
 let gameVolume  = 0.8;
 let musicVolume = 0.3;
+let gameMuted   = false;
+let musicMuted  = false;
 // strict mode removed — prevents total script death on any error
 
 const G = {
@@ -915,14 +917,16 @@ async function playUrl(url){
   const a = getAudio();
   a.onerror = null;
   a.src = url;
-  a.currentTime = 0;
   a.volume = (gameMuted || typeof gameVolume === 'undefined') ? 0 : gameVolume;
-  console.log('[audio] Playing:', url.slice(0, 60));
   a.onerror = (e) => console.error('[audio] Load error:', e);
+  // .load() is required in Firefox before .play() when src changes
+  a.load();
+  console.log('[audio] Playing:', url.slice(0,60));
   try {
-    const p = a.play();
-    if (p !== undefined) p.catch(e => console.warn('[audio] Play blocked:', e.name));
-  } catch(e) { console.warn('[audio] Play threw:', e); }
+    await a.play();
+  } catch(e) {
+    console.warn('[audio] play() blocked or failed:', e.name, e.message);
+  }
 }
 
 function stopAudio(){ if(audio){audio.pause();audio.src='';audio.onended=null;} }
@@ -1901,7 +1905,7 @@ function openAvatarChange() {
   if (!availableAvatars.length) return;
   // Build avatar grid
   pendingAvatarId = currentUser ? currentUser.avatar : null;
-  const grid = document.getElementById('avatar-grid');
+  const grid = document.getElementById('avatar-change-grid');
   grid.innerHTML = availableAvatars.map(a =>
     `<div class="avatar-cell${a.id===pendingAvatarId?' selected':''}"
           onclick="selectAvatarCell('${a.id}',this)">
@@ -1913,7 +1917,8 @@ function openAvatarChange() {
 
 function selectAvatarCell(id, el){
   pendingAvatarId = id;
-  document.querySelectorAll('.avatar-cell').forEach(c=>c.classList.remove('selected'));
+  const grid = document.getElementById('avatar-change-grid');
+  if (grid) grid.querySelectorAll('.avatar-cell').forEach(c=>c.classList.remove('selected'));
   el.classList.add('selected');
 }
 
@@ -1962,9 +1967,6 @@ document.addEventListener('click', e => {
     document.getElementById('settings-btn').classList.remove('open');
   }
 });
-
-let gameMuted  = false;
-let musicMuted = false;
 
 function setGameVolume(val) {
   gameVolume = val / 100;
@@ -2157,7 +2159,7 @@ async function submitBugReport(){
       </div>
       <div class="form-group">
         <label class="form-label">Choose Your Avatar</label>
-        <div class="avatar-grid" id="avatar-grid"></div>
+        <div class="avatar-grid" id="avatar-change-grid"></div>
       </div>
       <button class="btn btn-primary w-full" onclick="doRegister()">Create Account →</button>
     </div>
