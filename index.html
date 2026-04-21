@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tip of Your Tongue — Music Trivia</title>
+<!-- TOYT BUILD v4.1 -->
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="alternate icon" href="/favicon.svg">
 <link rel="apple-touch-icon" href="/favicon.svg">
@@ -252,6 +253,7 @@
   .guess-field::placeholder { color:var(--muted); }
   .guess-field:focus   { border-color:rgba(232,255,71,0.4); }
   .guess-field.correct { border-color:var(--accent3) !important; background:rgba(77,255,180,0.04); color:var(--accent3); }
+  .guess-field.close   { border-color:#f5a623 !important; background:rgba(245,166,35,0.04); color:#f5a623; }
   .guess-field.wrong   { border-color:var(--accent2); animation:shake 0.35s ease; }
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
   .guess-actions { display:flex; gap:10px; }
@@ -433,6 +435,85 @@
     position: fixed; top: 16px; right: 16px; z-index: 9000;
   }
 
+
+  /* ── SETTINGS COG ─────────────────────────────────────────────────────────── */
+  #settings-btn {
+    position: fixed; bottom: 22px; right: 22px; z-index: 8000;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--surface); border: 2px solid var(--border);
+    color: var(--muted); font-size: 26px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  }
+  #settings-btn:hover { border-color: var(--accent); color: var(--accent); transform: rotate(30deg); }
+  #settings-btn.open  { border-color: var(--accent); color: var(--accent); transform: rotate(60deg); }
+
+  #settings-panel {
+    position: fixed; bottom: 74px; right: 20px; z-index: 8000;
+    background: var(--surface); border: 1px solid var(--border);
+    width: 260px; padding: 0;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    transform: translateY(10px) scale(0.97);
+    opacity: 0; pointer-events: none;
+    transition: all 0.18s cubic-bezier(0.16,1,0.3,1);
+    transform-origin: bottom right;
+  }
+  #settings-panel::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+  }
+  #settings-panel.open {
+    opacity: 1; pointer-events: all;
+    transform: translateY(0) scale(1);
+  }
+  .sp-header {
+    padding: 14px 16px 10px;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px; letter-spacing: 2px; color: var(--accent);
+    border-bottom: 1px solid var(--border);
+  }
+  .sp-section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .sp-section:last-child { border-bottom: none; }
+  .sp-label {
+    font-size: 10px; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin-bottom: 10px; display: block;
+  }
+  .sp-row { display: flex; align-items: center; gap: 10px; }
+  .sp-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+  .vol-slider {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 3px; background: var(--border); outline: none; border-radius: 2px;
+    cursor: pointer;
+  }
+  .vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    border-radius: 50%; background: var(--accent); cursor: pointer;
+  }
+  .vol-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: none;
+  }
+  .vol-pct { font-size: 11px; color: var(--muted); width: 30px; text-align: right; font-family: 'Space Mono', monospace; }
+  .sp-toggle-row { display: flex; align-items: center; justify-content: space-between; }
+  .sp-toggle {
+    width: 36px; height: 20px; background: var(--border); border-radius: 10px;
+    position: relative; cursor: pointer; transition: background 0.2s; border: none;
+    flex-shrink: 0;
+  }
+  .sp-toggle.on { background: var(--accent3); }
+  .sp-toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 14px; height: 14px; border-radius: 50%; background: white;
+    transition: left 0.2s;
+  }
+  .sp-toggle.on::after { left: 19px; }
+  /* Quit button — fixed bottom left in game */
+  #quit-btn {
+    position: fixed; bottom: 22px; left: 22px; z-index: 8000;
+    display: none; padding: 14px 24px; font-size: 15px;
+  }
+  #quit-btn.visible { display: flex; }
+
 </style>
 </head>
 <body>
@@ -585,7 +666,7 @@
   <div class="game-header">
     <div class="game-logo">🎵 TOYT</div>
     <div class="round-info"><strong id="h-round">1</strong>of <span id="h-total">10</span> rounds</div>
-    <button class="btn btn-secondary btn-sm" onclick="confirmQuit()">Quit</button>
+    <div style="width:60px"></div><!-- spacer to keep round-info centred -->
   </div>
   <div class="game-body">
     <div class="cp-area" id="cp-area"></div>
@@ -676,7 +757,7 @@
 </div>
 
 <script>
-'use strict';
+// strict mode removed — prevents total script death on any error
 
 const G = {
   players:[], scores:{}, currentPlayerIdx:0,
@@ -693,14 +774,52 @@ const G = {
 };
 
 let audio = null;
-function getAudio(){ if(!audio){audio=new Audio();audio.crossOrigin='anonymous';} return audio; }
-async function playUrl(url){ const a=getAudio(); a.src=url; a.currentTime=0; try{await a.play();}catch(e){console.warn('Autoplay:',e);} }
+function getAudio(){ if(!audio){audio=new Audio();} return audio; }
+async function playUrl(url){
+  const a = getAudio();
+  a.src = url;
+  a.currentTime = 0;
+  a.volume = typeof gameVolume !== 'undefined' ? gameVolume : 0.8;
+  try {
+    await a.play();
+    const btn = document.getElementById('tap-to-play-btn');
+    if (btn) btn.style.display = 'none';
+  } catch(e) {
+    console.warn('Autoplay blocked:', e);
+    showTapToPlay(url);
+  }
+}
+
+function showTapToPlay(url) {
+  let btn = document.getElementById('tap-to-play-btn');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'tap-to-play-btn';
+    btn.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;padding:20px 40px;font-size:20px;font-family:"Bebas Neue",sans-serif;letter-spacing:2px;background:var(--accent);color:#080b10;border:none;cursor:pointer;';
+    document.body.appendChild(btn);
+  }
+  btn.textContent = '▶ TAP TO PLAY';
+  btn.style.display = 'block';
+  btn.onclick = async () => {
+    btn.style.display = 'none';
+    const a = getAudio();
+    a.src = url;
+    a.currentTime = 0;
+    try { await a.play(); } catch(e) { console.error('Play failed:', e); }
+  };
+}
 function stopAudio(){ if(audio){audio.pause();audio.src='';audio.onended=null;} }
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   window.scrollTo(0,0);
+  // Menu music: play on home/setup/howto/results, stop during game
+  const musicScreens = ['home','setup','howto','results'];
+  if (musicScreens.includes(id)) startMenuMusic();
+  else stopMenuMusic();
+  // Quit button: only visible in game
+  updateQuitBtn();
 }
 
 let playerCount=1;
@@ -712,10 +831,12 @@ function renderPlayers(){
   const list=document.getElementById('player-list');
   list.innerHTML='';
   for(let i=0;i<playerCount;i++){
+    // Player 1 defaults to logged-in username if available
+    const defaultName = (i===0 && currentUser) ? currentUser.username : DN[i];
     const d=document.createElement('div'); d.className='player-entry';
     d.innerHTML=`
       <div class="player-num">${i+1}</div>
-      <input class="form-input" id="pn${i}" type="text" value="${DN[i]}" placeholder="${DN[i]}" maxlength="20" style="font-family:'DM Sans',sans-serif;">
+      <input class="form-input" id="pn${i}" type="text" value="${defaultName}" placeholder="${defaultName}" maxlength="20" style="font-family:'DM Sans',sans-serif;">
       ${playerCount>1?`<button class="remove-player" onclick="removePlayer(${i})">✕</button>`:''}
     `;
     list.appendChild(d);
@@ -772,6 +893,16 @@ async function startGame(){
     const data=await res.json();
     songs=data.songs;
     if(!songs?.length) throw new Error('No songs returned');
+    // Deduplicate by normalised title — "Boats" and "Boats (Karaoke Edition)"
+    // are the same song. Keep the first occurrence (random order from DB).
+    const seenTitles = new Set();
+    songs = songs.filter(s => {
+      const norm = s.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
+      if (seenTitles.has(norm)) return false;
+      seenTitles.add(norm);
+      return true;
+    });
+    if(!songs.length) throw new Error('No songs after deduplication');
   } catch(err){
     showToast('Could not load songs — check your connection','error');
     showScreen('setup'); return;
@@ -842,6 +973,11 @@ async function beginRound(){
   setTimerUI(15,15); setVinyl('loading'); setStatus('load','⏳ Loading instrumental…');
   updateScoreboard();
 
+  // Warm the Audio element synchronously (before any await) so the browser
+  // keeps the user-gesture context alive for autoplay permission.
+  const a = getAudio();
+  a.load(); // touch the element synchronously to preserve gesture context
+
   let previewUrl=null;
   try{
     const res=await fetch(`/api/preview?id=${song.id}`);
@@ -863,10 +999,10 @@ async function beginRound(){
   }
 
   setVinyl('playing'); setStatus('play','▶ Now playing — name this song!');
-  await playUrl(previewUrl);
   G.roundStartTime=Date.now(); G.active=true;
   startTimer();
   getAudio().onended=()=>{ if(G.active) timeUp(); };
+  await playUrl(previewUrl);
 }
 
 function startTimer(){
@@ -1087,11 +1223,13 @@ function pts(e,t){return e<=5?(t==='song'?500:300):e<=10?(t==='song'?350:200):(t
 function yearPoints(guessedYear, actualYear, elapsed){
   if(!actualYear||isNaN(guessedYear)) return 0;
   const diff = Math.abs(guessedYear - actualYear);
-  const base = pts(elapsed, 'artist'); // same bracket as artist guess
-  if(diff === 0) return base;
-  if(diff === 1) return Math.round(base * 0.6);
-  if(diff === 2) return Math.round(base * 0.25);
-  return 0;
+  const base = pts(elapsed, 'artist');
+  if(diff === 0) return base;          // exact — full points, marked correct
+  if(diff === 1) return Math.round(base * 0.5); // close — half points, NOT marked correct
+  return 0;                            // ±2+ — no points
+}
+function yearIsExact(guessedYear, actualYear){
+  return actualYear && !isNaN(guessedYear) && Math.abs(guessedYear - actualYear) === 0;
 }
 
 function submitGuess(){
@@ -1114,11 +1252,21 @@ function submitGuess(){
       }else{markInput('guess-song-am','wrong');}
     }
     if(!G.yearGuessed&&yg.trim()){
-      const yp=yearPoints(parseInt(yg),song.decade,elapsed);
-      if(yp>0){
+      const yg_int=parseInt(yg);
+      const yp=yearPoints(yg_int,song.decade,elapsed);
+      const exact=yearIsExact(yg_int,song.decade);
+      if(exact){
+        // Exact match — full credit, mark correct, end year guessing
         G.yearGuessed=true;G.scores[player]+=yp;delta+=yp;
         markInput('guess-year','correct');showToast(`📅 Year! +${yp} pts`,'success');
-      }else{markInput('guess-year','wrong');}
+      } else if(yp>0){
+        // Close (±1) — partial credit, NOT marked correct, can try again
+        G.scores[player]+=yp;delta+=yp;
+        markInput('guess-year','close');showToast(`📅 Close! +${yp} pts — try again`,'info');
+        document.getElementById('guess-year').value='';
+      } else {
+        markInput('guess-year','wrong');
+      }
     }
     if(delta)updateScoreboard(player,delta);
     if(G.titleGuessed&&G.yearGuessed){
@@ -1400,11 +1548,15 @@ function initHomeAnimations() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  // Run each init independently — one failure must not block the others
-  renderPlayers();
+  loadSettings();   // restore volume/music prefs from localStorage (DOM now exists)
+  // initAuth must complete first so currentUser is set before renderPlayers runs
+  initAuth()
+    .catch(e => console.warn('initAuth failed:', e))
+    .finally(() => renderPlayers());
   initTestingMode().catch(e => console.warn('initTestingMode failed:', e));
-  initAuth().catch(e => console.warn('initAuth failed:', e));
   initHomeAnimations();
+  startMenuMusic();  // start menu music after first interaction isn't needed here —
+                     // autoplay will be blocked but that's fine, it starts on first click
 });
 
 // ── Auth state ────────────────────────────────────────────────────────────────
@@ -1554,6 +1706,7 @@ async function doLogin() {
     localStorage.setItem('toyt_token', authToken);
     closeAuthModal();
     updateProfileUI();
+    renderPlayers(); // update Player 1 name to logged-in username
     showToast('Welcome back, ' + currentUser.username + '!', 'success');
   } catch(e) {
     showAuthError('Network error — please try again');
@@ -1580,6 +1733,7 @@ async function doRegister() {
     localStorage.setItem('toyt_token', authToken);
     closeAuthModal();
     updateProfileUI();
+    renderPlayers(); // update Player 1 name to registered username
     showToast('Welcome to TOYT, ' + currentUser.username + '! 🎵', 'success');
   } catch(e) {
     showAuthError('Network error — please try again');
@@ -1593,6 +1747,7 @@ async function doLogout() {
   authToken = null; currentUser = null;
   localStorage.removeItem('toyt_token');
   updateProfileUI();
+  renderPlayers(); // revert Player 1 back to "Player 1"
   showToast('Signed out', 'info');
 }
 
@@ -1625,6 +1780,107 @@ document.addEventListener('keydown', e => {
   if (document.getElementById('form-login').style.display !== 'none') doLogin();
   else doRegister();
 });
+
+// ── Settings & menu music ──────────────────────────────────────────────────────
+let menuMusicOn = true;
+let gameVolume  = 0.8;
+let musicVolume = 0.3;
+
+function toggleSettings() {
+  const btn   = document.getElementById('settings-btn');
+  const panel = document.getElementById('settings-panel');
+  const open  = panel.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+
+// Close settings when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#settings-panel') && !e.target.closest('#settings-btn')) {
+    document.getElementById('settings-panel').classList.remove('open');
+    document.getElementById('settings-btn').classList.remove('open');
+  }
+});
+
+function setGameVolume(val) {
+  gameVolume = val / 100;
+  document.getElementById('vol-game-pct').textContent = val + '%';
+  if (audio) audio.volume = gameVolume;
+  localStorage.setItem('toyt_game_vol', val);
+}
+
+function setMusicVolume(val) {
+  musicVolume = val / 100;
+  document.getElementById('vol-music-pct').textContent = val + '%';
+  const m = document.getElementById('menu-music');
+  if (m) m.volume = musicVolume;
+  localStorage.setItem('toyt_music_vol', val);
+}
+
+function toggleMenuMusic() {
+  menuMusicOn = !menuMusicOn;
+  const btn = document.getElementById('music-toggle');
+  if (menuMusicOn) btn.classList.add('on');
+  else             btn.classList.remove('on');
+  const m = document.getElementById('menu-music');
+  if (m) {
+    if (menuMusicOn) { m.volume = musicVolume; m.play().catch(() => {}); }
+    else             { m.pause(); }
+  }
+  localStorage.setItem('toyt_music_on', menuMusicOn ? '1' : '0');
+}
+
+function startMenuMusic() {
+  const m = document.getElementById('menu-music');
+  if (!m || !menuMusicOn) return;
+  m.volume = musicVolume;
+  // Only try to play if we're not already playing
+  if (!m.paused) return;
+  m.play().catch(() => {
+    // Autoplay blocked — attach a one-time listener to start on next interaction
+    const resume = () => {
+      if (menuMusicOn) m.play().catch(() => {});
+      document.removeEventListener('click', resume);
+      document.removeEventListener('keydown', resume);
+    };
+    document.addEventListener('click', resume, { once: true });
+    document.addEventListener('keydown', resume, { once: true });
+  });
+}
+
+function stopMenuMusic() {
+  const m = document.getElementById('menu-music');
+  if (m) { m.pause(); m.currentTime = 0; }
+}
+
+// Show/hide quit button based on active screen
+function updateQuitBtn() {
+  const btn = document.getElementById('quit-btn');
+  const gameActive = document.getElementById('screen-game').classList.contains('active');
+  btn.classList.toggle('visible', gameActive);
+}
+
+// Load saved settings
+function loadSettings() {
+  const gv = localStorage.getItem('toyt_game_vol');
+  const mv = localStorage.getItem('toyt_music_vol');
+  const mo = localStorage.getItem('toyt_music_on');
+  if (gv !== null) {
+    gameVolume = parseInt(gv) / 100;
+    const slider = document.getElementById('vol-game');
+    if (slider) { slider.value = gv; document.getElementById('vol-game-pct').textContent = gv + '%'; }
+  }
+  if (mv !== null) {
+    musicVolume = parseInt(mv) / 100;
+    const slider = document.getElementById('vol-music');
+    if (slider) { slider.value = mv; document.getElementById('vol-music-pct').textContent = mv + '%'; }
+  }
+  if (mo === '0') {
+    menuMusicOn = false;
+    const btn = document.getElementById('music-toggle');
+    if (btn) btn.classList.remove('on');
+  }
+};
+
 </script>
 
 <!-- AUTH MODAL -->
@@ -1690,6 +1946,50 @@ document.addEventListener('keydown', e => {
     </div>
   </div>
 </div>
+
+
+<!-- SETTINGS COG BUTTON -->
+<button id="settings-btn" onclick="toggleSettings()" title="Settings">⚙</button>
+
+<!-- SETTINGS PANEL -->
+<div id="settings-panel">
+  <div class="sp-header">⚙ Settings</div>
+
+  <div class="sp-section">
+    <span class="sp-label">Game Volume</span>
+    <div class="sp-row">
+      <span class="sp-icon">🔊</span>
+      <input type="range" class="vol-slider" id="vol-game" min="0" max="100" value="80"
+             oninput="setGameVolume(this.value)">
+      <span class="vol-pct" id="vol-game-pct">80%</span>
+    </div>
+  </div>
+
+  <div class="sp-section">
+    <span class="sp-label">Menu Music</span>
+    <div class="sp-toggle-row">
+      <div class="sp-row">
+        <span class="sp-icon">🎶</span>
+        <span style="font-size:13px;color:var(--text);">Background Music</span>
+      </div>
+      <button class="sp-toggle on" id="music-toggle" onclick="toggleMenuMusic()"></button>
+    </div>
+    <div class="sp-row" style="margin-top:10px;">
+      <span class="sp-icon">🔉</span>
+      <input type="range" class="vol-slider" id="vol-music" min="0" max="100" value="30"
+             oninput="setMusicVolume(this.value)">
+      <span class="vol-pct" id="vol-music-pct">30%</span>
+    </div>
+  </div>
+</div>
+
+<!-- QUIT BUTTON (game screen only) -->
+<button class="btn btn-secondary btn-sm" id="quit-btn" onclick="confirmQuit()">✕ Quit</button>
+
+<!-- MENU MUSIC -->
+<audio id="menu-music" loop preload="none">
+  <source src="https://soundimage.org/wp-content/uploads/2016/10/Arcade-Fantasy.mp3" type="audio/mpeg">
+</audio>
 
 </body>
 </html>
