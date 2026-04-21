@@ -538,6 +538,68 @@
   .br-textarea { min-height:140px; line-height:1.6; }
   .br-note { font-size:12px; color:var(--muted); line-height:1.5; }
 
+
+  /* ── GAME OVERLAY (quit confirm, avatar picker) ─────────────────────────── */
+  .game-overlay {
+    position: fixed; inset: 0; z-index: 20000;
+    background: rgba(8,11,16,0.92);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+  .game-overlay.open { opacity: 1; pointer-events: all; }
+  .game-overlay-box {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 36px 40px; max-width: 400px; width: 90%;
+    text-align: center; position: relative;
+  }
+  .game-overlay-box::before {
+    content:''; display:block; height:2px;
+    background:linear-gradient(90deg,var(--accent),var(--accent3));
+    position:absolute; top:0; left:0; right:0;
+  }
+  .game-overlay-title {
+    font-family:'Bebas Neue',sans-serif; font-size:32px;
+    color:var(--accent); letter-spacing:2px; margin-bottom:8px;
+  }
+  .game-overlay-sub { font-size:14px; color:var(--muted); margin-bottom:28px; line-height:1.5; }
+  .game-overlay-actions { display:flex; flex-direction:column; gap:10px; }
+
+  /* Avatar picker grid */
+  .avatar-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:24px; }
+  .avatar-cell {
+    aspect-ratio:1; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:4px; border:2px solid var(--border);
+    cursor:pointer; font-size:28px; transition:all 0.15s;
+    background:var(--surface2);
+  }
+  .avatar-cell:hover { border-color:var(--accent); background:rgba(232,255,71,0.06); }
+  .avatar-cell.selected { border-color:var(--accent); background:rgba(232,255,71,0.1); }
+  .avatar-cell span { font-size:10px; color:var(--muted); letter-spacing:1px; text-transform:uppercase; }
+
+
+  .sp-mute-btn {
+    background: none; border: 1px solid var(--border); color: var(--text);
+    width: 28px; height: 28px; border-radius: 4px; cursor: pointer;
+    font-size: 14px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; transition: all 0.15s; padding:0;
+  }
+  .sp-mute-btn:hover { border-color: var(--accent); }
+  .sp-mute-btn.muted { border-color: var(--accent2); color: var(--accent2); }
+
+
+  .deezer-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 14px; padding: 9px 18px;
+    background: rgba(232,255,71,0.07); border: 1px solid rgba(232,255,71,0.25);
+    color: var(--accent); font-size: 13px; font-weight: 600;
+    letter-spacing: 1px; text-decoration: none; text-transform: uppercase;
+    transition: all 0.15s;
+  }
+  .deezer-link:hover {
+    background: rgba(232,255,71,0.14); border-color: var(--accent);
+  }
+
 </style>
 </head>
 <body>
@@ -570,7 +632,7 @@
       <span class="sub">Music Trivia</span>
     </div>
 
-    <p class="home-tagline">15 seconds. One instrumental.<br>How fast can you name it?</p>
+    <p class="home-tagline">20 seconds. One instrumental.<br>How fast can you name it?</p>
 
     <div class="home-menu">
       <button class="btn btn-primary"   onclick="showSetup()">▶ &nbsp;Play Now</button>
@@ -589,6 +651,9 @@
     <div class="lr-title"  id="lr-title">—</div>
     <div class="lr-artist" id="lr-artist"></div>
     <div class="lr-year"   id="lr-year"></div>
+    <a id="lr-deezer-link" class="deezer-link" href="#" target="_blank" rel="noopener" style="display:none;margin-top:14px;">
+      🎵 Listen on Deezer
+    </a>
   </div>
   <div class="lr-actions">
     <button class="btn btn-primary"   onclick="showResults()">🏆 See Scoreboard</button>
@@ -702,9 +767,9 @@
     <table class="pt-tbl">
       <thead><tr><th>Timing</th><th>Artist Name</th><th>Song Title</th></tr></thead>
       <tbody>
-        <tr><td>0 – 5 sec</td>    <td class="pv">300 pts</td><td class="pv">500 pts</td></tr>
-        <tr><td>5 – 10 sec</td>   <td class="pv">200 pts</td><td class="pv">350 pts</td></tr>
-        <tr><td>10 – 15 sec</td>  <td class="pv">100 pts</td><td class="pv">150 pts</td></tr>
+        <tr><td>0 – 7 sec</td>    <td class="pv">300 pts</td><td class="pv">500 pts</td></tr>
+        <tr><td>7 – 14 sec</td>   <td class="pv">200 pts</td><td class="pv">350 pts</td></tr>
+        <tr><td>14 – 20 sec</td>  <td class="pv">100 pts</td><td class="pv">150 pts</td></tr>
         <tr><td>Skip / Time Up</td><td class="pv">0 pts</td> <td class="pv">0 pts</td></tr>
       </tbody>
     </table>
@@ -744,7 +809,7 @@
       </div>
       <div class="timer-wrap">
         <div class="timer-row">
-          <div class="timer-digits" id="timer-digits">15</div>
+          <div class="timer-digits" id="timer-digits">20</div>
           <div class="timer-lbl">seconds left</div>
         </div>
         <div class="timer-bg"><div class="timer-fill" id="timer-fill"></div></div>
@@ -837,7 +902,7 @@ const G = {
   songGuessed:false, artistGuessed:false,
   // Artist mode tracked fields
   titleGuessed:false, yearGuessed:false,
-  timerInterval:null, timeLeft:15, roundStartTime:null, active:false,
+  timerInterval:null, timeLeft:20, roundStartTime:null, active:false,
   // 'genre' | 'artist'
   mode: 'genre',
   // The locked artist name when in artist mode
@@ -848,61 +913,24 @@ let audio = null;
 function getAudio(){ if(!audio){audio=new Audio();} return audio; }
 async function playUrl(url){
   const a = getAudio();
-  // Clear any previous error handlers
   a.onerror = null;
   a.src = url;
   a.currentTime = 0;
-  a.volume = typeof gameVolume !== 'undefined' ? gameVolume : 0.8;
-  // Log for debugging
-  console.log('[audio] Loading:', url.slice(0, 60));
+  a.volume = (gameMuted || typeof gameVolume === 'undefined') ? 0 : gameVolume;
+  console.log('[audio] Playing:', url.slice(0, 60));
   a.onerror = (e) => console.error('[audio] Load error:', e);
   try {
-    const playPromise = a.play();
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          console.log('[audio] Playing ok');
-          const btn = document.getElementById('tap-to-play-btn');
-          if (btn) btn.style.display = 'none';
-        })
-        .catch(e => {
-          console.warn('[audio] Play blocked:', e.name, e.message);
-          showTapToPlay(url);
-        });
-    }
-  } catch(e) {
-    console.warn('[audio] Play threw:', e);
-    showTapToPlay(url);
-  }
+    const p = a.play();
+    if (p !== undefined) p.catch(e => console.warn('[audio] Play blocked:', e.name));
+  } catch(e) { console.warn('[audio] Play threw:', e); }
 }
 
-function showTapToPlay(url) {
-  let btn = document.getElementById('tap-to-play-btn');
-  if (!btn) {
-    btn = document.createElement('button');
-    btn.id = 'tap-to-play-btn';
-    btn.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;padding:20px 40px;font-size:20px;font-family:"Bebas Neue",sans-serif;letter-spacing:2px;background:var(--accent);color:#080b10;border:none;cursor:pointer;';
-    document.body.appendChild(btn);
-  }
-  btn.textContent = '▶ TAP TO PLAY';
-  btn.style.display = 'block';
-  btn.onclick = async () => {
-    btn.style.display = 'none';
-    const a = getAudio();
-    a.src = url;
-    a.currentTime = 0;
-    try { await a.play(); } catch(e) { console.error('Play failed:', e); }
-  };
-}
 function stopAudio(){ if(audio){audio.pause();audio.src='';audio.onended=null;} }
 
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById('screen-'+id).classList.add('active');
   window.scrollTo(0,0);
-  // Always hide tap-to-play when changing screens
-  const ttp = document.getElementById('tap-to-play-btn');
-  if (ttp) ttp.style.display = 'none';
   // Menu music: play on home/setup/howto/results/bugreport, stop during game
   const musicScreens = ['home','setup','howto','results','lastround','bugreport'];
   if (musicScreens.includes(id)) startMenuMusic();
@@ -962,8 +990,7 @@ function onArtistChange(){
 
 // ── Start game ────────────────────────────────────────────────────────────────
 async function startGame(){
-  // Unlock the audio element right now, while we're inside a user gesture.
-  // Firefox requires this — it won't allow play() after an async gap.
+  // Unlock audio during user gesture — Firefox requires this
   try { const a = getAudio(); a.src=''; a.load(); } catch(e) {}
   const players=Array.from({length:playerCount},(_,i)=>document.getElementById(`pn${i}`)?.value.trim()||DN[i]);
   const rounds=parseInt(document.getElementById('rounds-select').value);
@@ -973,39 +1000,33 @@ async function startGame(){
   const isArtistMode=artist!=='all';
 
   showScreen('loading');
-  setLoadUI(isArtistMode?`${artist} — Artist Mode`:'Setting the Stage','Picking songs from the catalog…',10);
+  setLoadUI(isArtistMode?`${artist} — Artist Mode`:'Setting the Stage','Selecting songs & checking previews…',10);
 
   let songs;
   try{
-    let url=`/api/songs?count=${rounds}`;
-    if(isArtistMode) url+=`&artist=${encodeURIComponent(artist)}`;
-    else url+=`&era=${encodeURIComponent(era)}&genre=${encodeURIComponent(genre)}`;
-    const res=await fetch(url);
+    // POST to game-start — server selects songs AND resolves all preview URLs.
+    // PreviewUrls are never in the HTML source, only received here at game time.
+    const res=await fetch('/api/game-start',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({count:rounds, era, genre, artist}),
+    });
     if(!res.ok) throw new Error('Server error');
     const data=await res.json();
     songs=data.songs;
-    if(!songs?.length) throw new Error('No songs returned');
-    // Deduplicate by normalised title — "Boats" and "Boats (Karaoke Edition)"
-    // are the same song. Keep the first occurrence (random order from DB).
-    const seenTitles = new Set();
-    songs = songs.filter(s => {
-      const norm = s.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-      if (seenTitles.has(norm)) return false;
-      seenTitles.add(norm);
-      return true;
-    });
-    if(!songs.length) throw new Error('No songs after deduplication');
+    if(!songs?.length) throw new Error('No playable songs found');
   } catch(err){
-    showToast('Could not load songs — check your connection','error');
+    console.error('startGame error:',err);
+    showToast('Could not load songs — please try again','error');
     showScreen('setup'); return;
   }
 
   const actualRounds = songs.length;
   if(actualRounds < rounds){
-    setLoadUI('Heads up!',`Only ${actualRounds} songs found — adjusting to ${actualRounds} rounds`,90);
-    await new Promise(r=>setTimeout(r,1800));
+    setLoadUI('Heads up!',`Only ${actualRounds} playable songs found — adjusting rounds`,90);
+    await new Promise(r=>setTimeout(r,1500));
   } else {
-    setLoadUI('Ready!',`${songs.length} songs loaded`,100);
+    setLoadUI('Ready!',`${songs.length} songs ready to play`,100);
     await new Promise(r=>setTimeout(r,500));
   }
 
@@ -1014,7 +1035,7 @@ async function startGame(){
   G.currentSongIdx=0; G.currentPlayerIdx=0;
   G.mode=isArtistMode?'artist':'genre';
   G.lockedArtist=isArtistMode?artist:null;
-  G.era=era; G.genre=genre; // stored so replayGame can use same filters
+  G.era=era; G.genre=genre;
   showScreen('game'); beginRound();
 }
 
@@ -1031,23 +1052,10 @@ async function replayGame(){
   setLoadUI('Shuffling…','Getting a fresh set of songs…',20);
   let songs;
   try{
-    let url=`/api/songs?count=${G.totalRounds}`;
-    if(G.mode==='artist'&&G.lockedArtist){
-      url+=`&artist=${encodeURIComponent(G.lockedArtist)}`;
-    } else {
-      // Preserve the era/genre from the original game
-      if(G.era  &&G.era  !=='all') url+=`&era=${encodeURIComponent(G.era)}`;
-      if(G.genre&&G.genre!=='all') url+=`&genre=${encodeURIComponent(G.genre)}`;
-    }
-    const res=await fetch(url);
+    const body={count:G.totalRounds, era:G.era||'all', genre:G.genre||'all', artist:G.lockedArtist||'all'};
+    const res=await fetch('/api/game-start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const data=await res.json();
     songs=data.songs||G.songs;
-    // Deduplicate same as startGame
-    const seen=new Set();
-    songs=songs.filter(s=>{
-      const norm=s.title.toLowerCase().replace(/[^a-z0-9]/g,' ').replace(/\s+/g,' ').trim();
-      if(seen.has(norm))return false; seen.add(norm); return true;
-    });
   } catch(e){ console.warn('replayGame fetch failed:',e); songs=G.songs; }
   setLoadUI('Ready!','',100);
   await new Promise(r=>setTimeout(r,400));
@@ -1061,7 +1069,7 @@ async function beginRound(){
   const song=G.songs[G.currentSongIdx];
   G.songGuessed=false; G.artistGuessed=false;
   G.titleGuessed=false; G.yearGuessed=false;
-  G.active=false; G.timeLeft=15;
+  G.active=false; G.timeLeft=20;
   document.getElementById('h-round').textContent=G.round;
   document.getElementById('h-total').textContent=G.totalRounds;
   document.getElementById('cp-area').innerHTML=G.players.length>1
@@ -1075,32 +1083,16 @@ async function beginRound(){
   if(G.mode==='artist'&&G.lockedArtist){
     document.getElementById('artist-mode-banner').textContent=`🎤 ${G.lockedArtist}`;
   }
-  setTimerUI(15,15); setVinyl('loading'); setStatus('load','⏳ Loading instrumental…');
+  setTimerUI(20,20); setVinyl('loading'); setStatus('load','⏳ Loading instrumental…');
   updateScoreboard();
 
-  // Warm the Audio element synchronously (before any await) so the browser
-  // keeps the user-gesture context alive for autoplay permission.
-  const a = getAudio();
-  a.load(); // touch the element synchronously to preserve gesture context
-
-  let previewUrl=null;
-  try{
-    const res=await fetch(`/api/preview?id=${song.id}`);
-    const data=await res.json();
-    previewUrl=data.previewUrl;
-  } catch(e){ console.error('Preview error:',e); }
-
+  // Preview URL was resolved server-side at game start — play immediately
+  const previewUrl = song.previewUrl;
   if(!previewUrl){
-    setVinyl('error'); setStatus('warn','⚠ No preview available — trying next song');
-    disableGuess(true);
-    // Don't count this as a round — silently move to the next song index
-    // without incrementing G.round or G.currentPlayerIdx
+    // Fallback: skip this song silently (shouldn't happen with new game-start endpoint)
     G.currentSongIdx++;
-    if(G.currentSongIdx>=G.songs.length){
-      // Ran out of songs — end game
-      showResults(); return;
-    }
-    setTimeout(()=>beginRound(),1200); return;
+    if(G.currentSongIdx>=G.songs.length){ showResults(); return; }
+    beginRound(); return;
   }
 
   setVinyl('playing'); setStatus('play','▶ Now playing — name this song!');
@@ -1114,8 +1106,8 @@ function startTimer(){
   clearInterval(G.timerInterval);
   G.timerInterval=setInterval(()=>{
     if(!G.active)return;
-    G.timeLeft=Math.max(0,15-(Date.now()-G.roundStartTime)/1000);
-    setTimerUI(G.timeLeft,15);
+    G.timeLeft=Math.max(0,20-(Date.now()-G.roundStartTime)/1000);
+    setTimerUI(G.timeLeft,20);
     if(G.timeLeft<=0){clearInterval(G.timerInterval);timeUp();}
   },80);
 }
@@ -1166,6 +1158,12 @@ function endRound(){
         : `<div style="font-size:12px;color:var(--muted);margin-top:6px;">📅 Release year unknown</div>`
       }
       <div class="reveal-badges">${b}</div>
+      ${song.deezerLink
+        ? `<a href="${song.deezerLink}" target="_blank" rel="noopener" class="deezer-link">
+             🎵 Listen on Deezer
+           </a>`
+        : ''
+      }
     </div>`;
   document.getElementById('next-area').style.display='block';
   updateScoreboard();
@@ -1318,7 +1316,7 @@ function matchesTitle(guess, title){
   return isMatch(guess, title);
 }
 
-function pts(e,t){return e<=5?(t==='song'?500:300):e<=10?(t==='song'?350:200):(t==='song'?150:100);}
+function pts(e,t){return e<=7?(t==='song'?500:300):e<=14?(t==='song'?350:200):(t==='song'?150:100);}
 
 // Year guessing — same bracket timing as other guesses, with accuracy tolerance:
 //   Exact year         → full points for the timing bracket
@@ -1506,21 +1504,27 @@ function updateScoreboard(hl=null,delta=0){
 function showLastRound(){
   // Stop game audio immediately — don't play over menu music
   stopAudio();
-  const ttp = document.getElementById('tap-to-play-btn');
-  if (ttp) ttp.style.display = 'none';
   // Show the last song's reveal card on the dedicated last-round screen
   const song = G.songs[G.currentSongIdx - 1]; // we already incremented
   const yearStr = song && song.decade ? song.decade : null;
   document.getElementById('lr-title').textContent  = song ? song.title  : '—';
   document.getElementById('lr-artist').textContent = song ? 'by ' + song.artist : '';
   document.getElementById('lr-year').textContent   = yearStr ? '📅 Originally released: ' + yearStr : '';
+  // Deezer link
+  const lrLink = document.getElementById('lr-deezer-link');
+  if (lrLink) {
+    if (song && song.deezerLink) {
+      lrLink.href = song.deezerLink;
+      lrLink.style.display = 'inline-flex';
+    } else {
+      lrLink.style.display = 'none';
+    }
+  }
   showScreen('lastround');
 }
 
 function showResults(){
   stopAudio();
-  const ttp = document.getElementById('tap-to-play-btn');
-  if (ttp) ttp.style.display = 'none';
   showScreen('results');
   const sorted=[...G.players].sort((a,b)=>G.scores[b]-G.scores[a]);
   const podium=document.getElementById('podium');
@@ -1563,7 +1567,22 @@ function showToast(msg,type='info'){
   clearTimeout(tT);tT=setTimeout(()=>t.classList.remove('show'),2700);
 }
 function confirmQuit(){
-  if(confirm('Quit the current game?')){G.active=false;clearInterval(G.timerInterval);stopAudio();showScreen('home');}
+  // Pause game while overlay is shown
+  G.active=false; clearInterval(G.timerInterval);
+  document.getElementById('quit-overlay').classList.add('open');
+}
+function doQuit(){
+  closeOverlay('quit-overlay');
+  stopAudio();
+  showScreen('home');
+}
+function closeOverlay(id){
+  document.getElementById(id).classList.remove('open');
+  // If quitting was cancelled, resume the game
+  if(id==='quit-overlay' && G.roundStartTime && !G.songGuessed && !G.artistGuessed && !G.titleGuessed){
+    G.active=true;
+    startTimer();
+  }
 }
 
 
@@ -1875,14 +1894,35 @@ async function doLogout() {
 }
 
 // ── Change avatar (inline prompt for MVP) ────────────────────────────────────
-async function openAvatarChange() {
+let pendingAvatarId = null;
+
+function openAvatarChange() {
   document.getElementById('profile-dropdown').classList.remove('open');
   if (!availableAvatars.length) return;
-  const lines = availableAvatars.map((a, i) => i + ': ' + a.emoji + ' ' + a.label).join('\n');
-  const input = prompt('Choose your avatar:\n' + lines + '\n\nEnter the number (0-' + (availableAvatars.length-1) + '):');
-  const idx   = parseInt(input);
-  if (isNaN(idx) || !availableAvatars[idx]) return;
-  const av = availableAvatars[idx];
+  // Build avatar grid
+  pendingAvatarId = currentUser ? currentUser.avatar : null;
+  const grid = document.getElementById('avatar-grid');
+  grid.innerHTML = availableAvatars.map(a =>
+    `<div class="avatar-cell${a.id===pendingAvatarId?' selected':''}"
+          onclick="selectAvatarCell('${a.id}',this)">
+       ${a.emoji}<span>${a.label}</span>
+     </div>`
+  ).join('');
+  document.getElementById('avatar-overlay').classList.add('open');
+}
+
+function selectAvatarCell(id, el){
+  pendingAvatarId = id;
+  document.querySelectorAll('.avatar-cell').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function confirmAvatarChange(){
+  if(!pendingAvatarId) return;
+  const av = availableAvatars.find(a=>a.id===pendingAvatarId);
+  if(!av) return;
+  const btn = document.getElementById('avatar-confirm-btn');
+  btn.disabled=true; btn.textContent='Saving…';
   try {
     const r = await authFetch('/api/auth/avatar', {
       method: 'PUT',
@@ -1891,9 +1931,11 @@ async function openAvatarChange() {
     if (r.ok) {
       currentUser.avatar = av.id;
       updateProfileUI();
+      closeOverlay('avatar-overlay');
       showToast('Avatar updated to ' + av.emoji, 'success');
     }
-  } catch(e) {}
+  } catch(e) { showToast('Failed to update avatar','error'); }
+  finally { btn.disabled=false; btn.textContent='✓  Save Avatar'; }
 }
 
 // Enter key submits whichever auth form is visible
@@ -1921,10 +1963,13 @@ document.addEventListener('click', e => {
   }
 });
 
+let gameMuted  = false;
+let musicMuted = false;
+
 function setGameVolume(val) {
   gameVolume = val / 100;
   document.getElementById('vol-game-pct').textContent = val + '%';
-  if (audio) audio.volume = gameVolume;
+  if (audio && !gameMuted) audio.volume = gameVolume;
   localStorage.setItem('toyt_game_vol', val);
 }
 
@@ -1932,8 +1977,25 @@ function setMusicVolume(val) {
   musicVolume = val / 100;
   document.getElementById('vol-music-pct').textContent = val + '%';
   const m = document.getElementById('menu-music');
-  if (m) m.volume = musicVolume;
+  if (m && !musicMuted) m.volume = musicVolume;
   localStorage.setItem('toyt_music_vol', val);
+}
+
+function toggleGameMute() {
+  gameMuted = !gameMuted;
+  const btn = document.getElementById('mute-game-btn');
+  if (btn) { btn.textContent = gameMuted ? '🔇' : '🔊'; btn.classList.toggle('muted', gameMuted); }
+  if (audio) audio.volume = gameMuted ? 0 : gameVolume;
+  localStorage.setItem('toyt_game_muted', gameMuted ? '1' : '0');
+}
+
+function toggleMusicMute() {
+  musicMuted = !musicMuted;
+  const btn = document.getElementById('mute-music-btn');
+  if (btn) { btn.textContent = musicMuted ? '🔇' : '🔉'; btn.classList.toggle('muted', musicMuted); }
+  const m = document.getElementById('menu-music');
+  if (m) m.volume = musicMuted ? 0 : musicVolume;
+  localStorage.setItem('toyt_music_muted', musicMuted ? '1' : '0');
 }
 
 function toggleMenuMusic() {
@@ -1981,54 +2043,77 @@ function updateQuitBtn() {
 
 // Load saved settings
 function loadSettings() {
-  // Wire up settings controls via addEventListener (more reliable than inline oninput/onclick)
   const volGame  = document.getElementById('vol-game');
   const volMusic = document.getElementById('vol-music');
   const musBtn   = document.getElementById('music-toggle');
 
-  if (volGame)  volGame.addEventListener('input',  function() { setGameVolume(this.value); });
-  if (volMusic) volMusic.addEventListener('input',  function() { setMusicVolume(this.value); });
-  if (musBtn)   musBtn.addEventListener('click',  function() { toggleMenuMusic(); });
+  // Wire via addEventListener — more reliable than inline handlers
+  if (volGame)  volGame.addEventListener('input', function() { setGameVolume(this.value); });
+  if (volMusic) volMusic.addEventListener('input', function() { setMusicVolume(this.value); });
+  if (musBtn)   musBtn.addEventListener('click', toggleMenuMusic);
 
-  // Restore saved values
+  // Restore game volume
   const gv = localStorage.getItem('toyt_game_vol');
-  const mv = localStorage.getItem('toyt_music_vol');
-  const mo = localStorage.getItem('toyt_music_on');
   if (gv !== null) {
     gameVolume = parseInt(gv) / 100;
-    if (volGame) volGame.value = gv;
-    const pct = document.getElementById('vol-game-pct');
-    if (pct) pct.textContent = gv + '%';
+    if (volGame) { volGame.value = gv; document.getElementById('vol-game-pct').textContent = gv + '%'; }
   }
+  // Restore game mute
+  if (localStorage.getItem('toyt_game_muted') === '1') {
+    gameMuted = true;
+    const b = document.getElementById('mute-game-btn');
+    if (b) { b.textContent = '🔇'; b.classList.add('muted'); }
+  }
+  // Restore music volume
+  const mv = localStorage.getItem('toyt_music_vol');
   if (mv !== null) {
     musicVolume = parseInt(mv) / 100;
-    if (volMusic) volMusic.value = mv;
-    const pct = document.getElementById('vol-music-pct');
-    if (pct) pct.textContent = mv + '%';
+    if (volMusic) { volMusic.value = mv; document.getElementById('vol-music-pct').textContent = mv + '%'; }
   }
-  if (mo === '0') {
+  // Restore music mute
+  if (localStorage.getItem('toyt_music_muted') === '1') {
+    musicMuted = true;
+    const b = document.getElementById('mute-music-btn');
+    if (b) { b.textContent = '🔇'; b.classList.add('muted'); }
+  }
+  // Restore menu music on/off
+  if (localStorage.getItem('toyt_music_on') === '0') {
     menuMusicOn = false;
     if (musBtn) musBtn.classList.remove('on');
   }
 };
 
 
-function submitBugReport(){
-  const title = (document.getElementById('br-title').value||'').trim();
-  const body  = (document.getElementById('br-body').value||'').trim();
+async function submitBugReport(){
+  const titleEl = document.getElementById('br-title');
+  const bodyEl  = document.getElementById('br-body');
+  const title = (titleEl.value||'').trim();
+  const body  = (bodyEl.value||'').trim();
   if(!title){ showToast('Please add a bug title','error'); return; }
   if(!body) { showToast('Please describe the bug','error'); return; }
-  const to      = 'bugs@tipofmytongue.app';
-  const subject = encodeURIComponent('[TOYT Bug] ' + title);
-  const bodyEnc = encodeURIComponent(body + '\n\n---\nSubmitted from TOYT v4.2');
-  window.location.href = `mailto:${to}?subject=${subject}&body=${bodyEnc}`;
-  // Clear fields after sending
-  setTimeout(()=>{
-    document.getElementById('br-title').value='';
-    document.getElementById('br-body').value='';
-    showScreen('home');
-    showToast('Opening your email client…','success');
-  }, 500);
+  const btn = document.querySelector('#screen-bugreport .btn-primary');
+  if(btn) { btn.disabled=true; btn.textContent='Sending…'; }
+  try {
+    const res = await fetch('/api/bug-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body }),
+    });
+    const data = await res.json();
+    if(res.ok && data.ok){
+      titleEl.value='';
+      bodyEl.value='';
+      showScreen('home');
+      showToast('Bug report sent — thanks!','success');
+    } else {
+      showToast('Failed to send — please try again','error');
+    }
+  } catch(e){
+    console.error('submitBugReport:', e);
+    showToast('Network error — please try again','error');
+  } finally {
+    if(btn){ btn.disabled=false; btn.textContent='✉  Send Report'; }
+  }
 }
 
 </script>
@@ -2108,7 +2193,7 @@ function submitBugReport(){
   <div class="sp-section">
     <span class="sp-label">Game Volume</span>
     <div class="sp-row">
-      <span class="sp-icon">🔊</span>
+      <button class="sp-mute-btn" id="mute-game-btn" title="Toggle mute" onclick="toggleGameMute()">🔊</button>
       <input type="range" class="vol-slider" id="vol-game" min="0" max="100" value="80">
       <span class="vol-pct" id="vol-game-pct">80%</span>
     </div>
@@ -2124,7 +2209,7 @@ function submitBugReport(){
       <button class="sp-toggle on" id="music-toggle"></button>
     </div>
     <div class="sp-row" style="margin-top:10px;">
-      <span class="sp-icon">🔉</span>
+      <button class="sp-mute-btn" id="mute-music-btn" title="Toggle mute" onclick="toggleMusicMute()">🔉</button>
       <input type="range" class="vol-slider" id="vol-music" min="0" max="100" value="30">
       <span class="vol-pct" id="vol-music-pct">30%</span>
     </div>
@@ -2138,6 +2223,31 @@ function submitBugReport(){
 <audio id="menu-music" loop preload="none">
   <source src="https://soundimage.org/wp-content/uploads/2016/10/Arcade-Fantasy.mp3" type="audio/mpeg">
 </audio>
+
+
+<!-- QUIT CONFIRM OVERLAY -->
+<div class="game-overlay" id="quit-overlay">
+  <div class="game-overlay-box">
+    <div class="game-overlay-title">Quit Game?</div>
+    <div class="game-overlay-sub">Your progress will be lost.<br>Are you sure?</div>
+    <div class="game-overlay-actions">
+      <button class="btn btn-danger"      onclick="doQuit()">✕ &nbsp;Yes, Quit</button>
+      <button class="btn btn-secondary"   onclick="closeOverlay('quit-overlay')">Keep Playing</button>
+    </div>
+  </div>
+</div>
+
+<!-- AVATAR PICKER OVERLAY -->
+<div class="game-overlay" id="avatar-overlay">
+  <div class="game-overlay-box" style="max-width:480px;">
+    <div class="game-overlay-title">Choose Avatar</div>
+    <div class="avatar-grid" id="avatar-grid"></div>
+    <div class="game-overlay-actions">
+      <button class="btn btn-primary"   id="avatar-confirm-btn" onclick="confirmAvatarChange()">✓ &nbsp;Save Avatar</button>
+      <button class="btn btn-secondary" onclick="closeOverlay('avatar-overlay')">Cancel</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
