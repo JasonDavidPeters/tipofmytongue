@@ -757,6 +757,7 @@
 </div>
 
 <script>
+console.log("TOYT v4.2 loaded - " + new Date().toISOString());
 // strict mode removed — prevents total script death on any error
 
 const G = {
@@ -777,15 +778,30 @@ let audio = null;
 function getAudio(){ if(!audio){audio=new Audio();} return audio; }
 async function playUrl(url){
   const a = getAudio();
+  // Clear any previous error handlers
+  a.onerror = null;
   a.src = url;
   a.currentTime = 0;
   a.volume = typeof gameVolume !== 'undefined' ? gameVolume : 0.8;
+  // Log for debugging
+  console.log('[audio] Loading:', url.slice(0, 60));
+  a.onerror = (e) => console.error('[audio] Load error:', e);
   try {
-    await a.play();
-    const btn = document.getElementById('tap-to-play-btn');
-    if (btn) btn.style.display = 'none';
+    const playPromise = a.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          console.log('[audio] Playing ok');
+          const btn = document.getElementById('tap-to-play-btn');
+          if (btn) btn.style.display = 'none';
+        })
+        .catch(e => {
+          console.warn('[audio] Play blocked:', e.name, e.message);
+          showTapToPlay(url);
+        });
+    }
   } catch(e) {
-    console.warn('Autoplay blocked:', e);
+    console.warn('[audio] Play threw:', e);
     showTapToPlay(url);
   }
 }
@@ -873,6 +889,9 @@ function onArtistChange(){
 
 // ── Start game ────────────────────────────────────────────────────────────────
 async function startGame(){
+  // Unlock the audio element right now, while we're inside a user gesture.
+  // Firefox requires this — it won't allow play() after an async gap.
+  try { const a = getAudio(); a.src=''; a.load(); } catch(e) {}
   const players=Array.from({length:playerCount},(_,i)=>document.getElementById(`pn${i}`)?.value.trim()||DN[i]);
   const rounds=parseInt(document.getElementById('rounds-select').value);
   const era=document.getElementById('era-select').value;
@@ -1067,6 +1086,7 @@ function endRound(){
 }
 
 function nextRound(){
+  try { const a = getAudio(); a.load(); } catch(e) {} // re-unlock for Firefox
   G.currentSongIdx++; G.round++;
   if(G.players.length>1) G.currentPlayerIdx=(G.currentPlayerIdx+1)%G.players.length;
   if(G.currentSongIdx>=G.songs.length){showResults();return;}
@@ -1861,23 +1881,34 @@ function updateQuitBtn() {
 
 // Load saved settings
 function loadSettings() {
+  // Wire up settings controls via addEventListener (more reliable than inline oninput/onclick)
+  const volGame  = document.getElementById('vol-game');
+  const volMusic = document.getElementById('vol-music');
+  const musBtn   = document.getElementById('music-toggle');
+
+  if (volGame)  volGame.addEventListener('input',  function() { setGameVolume(this.value); });
+  if (volMusic) volMusic.addEventListener('input',  function() { setMusicVolume(this.value); });
+  if (musBtn)   musBtn.addEventListener('click',  function() { toggleMenuMusic(); });
+
+  // Restore saved values
   const gv = localStorage.getItem('toyt_game_vol');
   const mv = localStorage.getItem('toyt_music_vol');
   const mo = localStorage.getItem('toyt_music_on');
   if (gv !== null) {
     gameVolume = parseInt(gv) / 100;
-    const slider = document.getElementById('vol-game');
-    if (slider) { slider.value = gv; document.getElementById('vol-game-pct').textContent = gv + '%'; }
+    if (volGame) volGame.value = gv;
+    const pct = document.getElementById('vol-game-pct');
+    if (pct) pct.textContent = gv + '%';
   }
   if (mv !== null) {
     musicVolume = parseInt(mv) / 100;
-    const slider = document.getElementById('vol-music');
-    if (slider) { slider.value = mv; document.getElementById('vol-music-pct').textContent = mv + '%'; }
+    if (volMusic) volMusic.value = mv;
+    const pct = document.getElementById('vol-music-pct');
+    if (pct) pct.textContent = mv + '%';
   }
   if (mo === '0') {
     menuMusicOn = false;
-    const btn = document.getElementById('music-toggle');
-    if (btn) btn.classList.remove('on');
+    if (musBtn) musBtn.classList.remove('on');
   }
 };
 
@@ -1959,8 +1990,7 @@ function loadSettings() {
     <span class="sp-label">Game Volume</span>
     <div class="sp-row">
       <span class="sp-icon">🔊</span>
-      <input type="range" class="vol-slider" id="vol-game" min="0" max="100" value="80"
-             oninput="setGameVolume(this.value)">
+      <input type="range" class="vol-slider" id="vol-game" min="0" max="100" value="80">
       <span class="vol-pct" id="vol-game-pct">80%</span>
     </div>
   </div>
@@ -1972,12 +2002,11 @@ function loadSettings() {
         <span class="sp-icon">🎶</span>
         <span style="font-size:13px;color:var(--text);">Background Music</span>
       </div>
-      <button class="sp-toggle on" id="music-toggle" onclick="toggleMenuMusic()"></button>
+      <button class="sp-toggle on" id="music-toggle"></button>
     </div>
     <div class="sp-row" style="margin-top:10px;">
       <span class="sp-icon">🔉</span>
-      <input type="range" class="vol-slider" id="vol-music" min="0" max="100" value="30"
-             oninput="setMusicVolume(this.value)">
+      <input type="range" class="vol-slider" id="vol-music" min="0" max="100" value="30">
       <span class="vol-pct" id="vol-music-pct">30%</span>
     </div>
   </div>
