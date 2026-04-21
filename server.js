@@ -103,13 +103,14 @@ app.get('/api/songs', async (req, res) => {
 });
 
 // ─── POST /api/game-start ─────────────────────────────────────────────────────
-// Selects songs AND resolves all Deezer preview URLs server-side.
-// Returns {songs: [{id,title,artist,era,genre,decade,previewUrl}]}
-// Preview URLs never appear in client HTML source — only received at game time.
+// Selects and sequences songs server-side (hidden from client HTML source).
+// Does NOT resolve preview URLs — Deezer CDN URLs are IP-bound so they must
+// be fetched from the user's browser, not the server.
+// Returns {songs: [{id,title,artist,era,genre,decade,deezerLink}]}
 app.post('/api/game-start', async (req, res) => {
   const { count = 10, era = 'all', genre = 'all', artist = 'all' } = req.body || {};
 
-  // ── Step 1: Select songs (same logic as /api/songs) ──────────────────────
+  // ── Step 1: Select songs ──────────────────────────────────────────────────
   const conditions = ['enabled = true'];
   const params = [];
 
@@ -122,14 +123,14 @@ app.post('/api/game-start', async (req, res) => {
   }
 
   const where = conditions.join(' AND ');
-  // Fetch 3x the requested count so we have spares after preview filtering
-  const fetchCount = Math.min(parseInt(count) * 3, 300);
+  // Fetch 2x to have spares after dedup
+  const fetchCount = Math.min(parseInt(count) * 2, 200);
   params.push(fetchCount);
 
   let candidates;
   try {
     const result = await pool.query(
-      `SELECT id, title, artist, era, genre, decade, deezer_query
+      `SELECT id, title, artist, era, genre, decade
        FROM songs WHERE ${where} ORDER BY RANDOM() LIMIT $${params.length}`,
       params
     );
@@ -151,56 +152,13 @@ app.post('/api/game-start', async (req, res) => {
     return true;
   });
 
-  // ── Step 3: Resolve preview URLs in parallel (capped concurrency) ─────────
-  const needed = parseInt(count);
-  const resolvedSongs = [];
+  // ── Step 3: Trim to requested count and add Deezer search links ───────────
+  const songs = candidates.slice(0, parseInt(count)).map(s => ({
+    ...s,
+    deezerLink: `https://www.deezer.com/search/${encodeURIComponent(s.title + ' ' + s.artist)}`,
+  }));
 
-  // Process in batches of 5 to avoid hammering Deezer
-  for (let i = 0; i < candidates.length && resolvedSongs.length < needed; i += 5) {
-    const batch = candidates.slice(i, i + 5);
-    const results = await Promise.all(batch.map(async song => {
-      const queries = [
-        song.deezer_query,
-        `${song.title} "${song.artist}" karaoke`,
-        `${song.title} "${song.artist}" instrumental`,
-        `"${song.artist}" ${song.title} karaoke instrumental`,
-        `${song.title} karaoke instrumental`,
-        `${song.title} karaoke`,
-      ];
-      for (const q of queries) {
-        try {
-          const r = await fetch(
-            `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=50`,
-            { signal: AbortSignal.timeout(8000) }
-          );
-          if (!r.ok) continue;
-          const data = await r.json();
-          for (const t of (data.data || [])) {
-            if (t.preview && isInstrumental(t)) {
-              // t.link is the karaoke track page — we build a search URL for the
-              // original song instead so users find the real recording
-              const deezerLink = `https://www.deezer.com/search/${encodeURIComponent(song.title + ' ' + song.artist)}`;
-              return { ...song, previewUrl: t.preview, deezerLink };
-            }
-          }
-        } catch (e) { /* try next query */ }
-      }
-      console.warn(`[game-start] No preview: ${song.title} — ${song.artist}`);
-      return null; // no preview found
-    }));
-
-    for (const s of results) {
-      if (s && resolvedSongs.length < needed) resolvedSongs.push(s);
-    }
-  }
-
-  if (!resolvedSongs.length) {
-    return res.status(503).json({ error: 'Could not find any playable songs — try again' });
-  }
-
-  // Strip deezer_query before sending to client (internal field)
-  const clientSongs = resolvedSongs.map(({ deezer_query, ...rest }) => rest);
-  res.json({ songs: clientSongs, total: clientSongs.length });
+  res.json({ songs, total: songs.length });
 });
 
 // ─── GET /api/preview?id=<songId> ─────────────────────────────────────────────
